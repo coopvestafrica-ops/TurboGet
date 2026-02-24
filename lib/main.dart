@@ -7,29 +7,51 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'services/ad_manager.dart';
 import 'services/auth_service.dart';
 import 'services/media_detector_service.dart';
+import 'services/theme_service.dart';
+import 'services/download_scheduler.dart';
 import 'models/download_item.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin_panel.dart';
+import 'screens/settings_screen.dart';
+import 'screens/download_history_screen.dart';
+import 'screens/file_browser_screen.dart';
+import 'screens/batch_import_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Future.wait([
     AdManager().initialize(),
     AuthService.instance.initialize(),
+    ThemeService.instance.initialize(),
+    DownloadScheduler.instance.initialize(),
   ]);
   runApp(const MyApp());
 }
 
-
-
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'TurboGet',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeService.instance.lightTheme,
+      darkTheme: ThemeService.instance.darkTheme,
+      themeMode: ThemeService.instance.themeMode,
+      home: const HomeScreen(),
+    );
+  }
 }
 
-class _MyAppState extends State<MyApp> {
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   static const MethodChannel _method = MethodChannel('com.example.downloader/methods');
   static const EventChannel _events = EventChannel('com.example.downloader/events');
 
@@ -37,13 +59,12 @@ class _MyAppState extends State<MyApp> {
   StreamSubscription<dynamic>? _eventSub;
   final TextEditingController _urlController = TextEditingController();
   
-  // Services
   final _authService = AuthService.instance;
   final _adManager = AdManager();
+  final _scheduler = DownloadScheduler.instance;
   
-  // Ad related fields
   BannerAd? _bannerAd;
-  int _downloadCount = 0; // Track downloads to show interstitial ads
+  int _downloadCount = 0;
 
   bool get _shouldShowAds => _authService.currentUser?.shouldShowAds ?? true;
 
@@ -55,6 +76,7 @@ class _MyAppState extends State<MyApp> {
     _startListening();
     _initAds();
     _initMediaDetection();
+    _initScheduler();
   }
 
   void _initAds() {
@@ -67,7 +89,7 @@ class _MyAppState extends State<MyApp> {
   void _showInterstitialAd() {
     if (!_shouldShowAds) return;
     _downloadCount++;
-    if (_downloadCount % 3 == 0) { // Show ad every 3 downloads
+    if (_downloadCount % 3 == 0) {
       _adManager.showInterstitialAd();
     }
   }
@@ -103,13 +125,12 @@ class _MyAppState extends State<MyApp> {
             
             if (status == 'complete') {
               _queue.removeAt(idx);
-              _showInterstitialAd(); // Show ad on download completion
+              _showInterstitialAd();
             }
           }
         });
       }
     }, onError: (e) {
-      // ignore: avoid_print
       print('Event channel error: $e');
     });
   }
@@ -118,7 +139,6 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initMediaDetection() async {
     await _mediaDetector.initialize();
-    // Start periodic clipboard check
     _clipboardCheckTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
       final data = await Clipboard.getData(Clipboard.kTextPlain);
       if (data?.text != null) {
@@ -127,12 +147,23 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  void _initScheduler() {
+    _scheduler.onSchedulerStatusChanged = (status) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Scheduler: $status')),
+        );
+      }
+    };
+  }
+
   @override
   void dispose() {
     _eventSub?.cancel();
     _urlController.dispose();
     _mediaDetector.dispose();
     _clipboardCheckTimer?.cancel();
+    _scheduler.pauseAllScheduled();
     super.dispose();
   }
 
@@ -168,9 +199,8 @@ class _MyAppState extends State<MyApp> {
         final idx = _queue.indexWhere((d) => d.id == id);
         if (idx != -1) _queue[idx].status = 'downloading';
       });
-      _showInterstitialAd(); // Show ad after starting download
+      _showInterstitialAd();
     } on PlatformException catch (e) {
-      // ignore: avoid_print
       print('startDownload failed: ${e.message}');
       setState(() {
         final idx = _queue.indexWhere((d) => d.id == id);
@@ -179,12 +209,17 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> _addBatchDownloads(List<String> urls) async {
+    for (final url in urls) {
+      await _addDownload(url);
+    }
+  }
+
   Future<void> _pauseDownload(DownloadItem item) async {
     try {
       await _method.invokeMethod('pauseDownload', {'id': item.id});
       setState(() => item.status = 'paused');
     } catch (e) {
-      // ignore: avoid_print
       print('pause error: $e');
     }
   }
@@ -194,7 +229,6 @@ class _MyAppState extends State<MyApp> {
       await _method.invokeMethod('resumeDownload', {'id': item.id});
       setState(() => item.status = 'downloading');
     } catch (e) {
-      // ignore: avoid_print
       print('resume error: $e');
     }
   }
@@ -204,99 +238,215 @@ class _MyAppState extends State<MyApp> {
       await _method.invokeMethod('cancelDownload', {'id': item.id});
       setState(() => item.status = 'cancelled');
     } catch (e) {
-      // ignore: avoid_print
       print('cancel error: $e');
     }
   }
 
+  void _showBatchImport() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BatchImportScreen(onImport: _addBatchDownloads),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter IDM Starter',
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('TurboGet'),
-          actions: [
-            IconButton(
-              icon: Icon(_authService.isLoggedIn ? Icons.person : Icons.login),
-              onPressed: () async {
-                if (_authService.isAdmin) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AdminPanel()),
-                  );
-                } else {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  );
-                  if (result == true) {
-                    setState(() => _initAds()); // Refresh ads based on new user status
-                  }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('TurboGet'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Download History',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DownloadHistoryScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            tooltip: 'File Browser',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FileBrowserScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: Icon(_authService.isLoggedIn ? Icons.person : Icons.login),
+            onPressed: () async {
+              if (_authService.isAdmin) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AdminPanel()),
+                );
+              } else {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+                if (result == true) {
+                  setState(() => _initAds());
                 }
-              },
-            ),
-          ],
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            children: [
-              if (_shouldShowAds && _bannerAd != null)
-                SizedBox(
-                  width: _bannerAd!.size.width.toDouble(),
-                  height: _bannerAd!.size.height.toDouble(),
-                  child: AdWidget(ad: _bannerAd!),
+              }
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          children: [
+            if (_shouldShowAds && _bannerAd != null)
+              SizedBox(
+                width: _bannerAd!.size.width.toDouble(),
+                height: _bannerAd!.size.height.toDouble(),
+                child: AdWidget(ad: _bannerAd!),
+              ),
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _urlController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter file URL',
+                    prefixIcon: Icon(Icons.link),
+                  ),
                 ),
-              Row(children: [
-                Expanded(child: TextField(controller: _urlController, decoration: const InputDecoration(hintText: 'Enter file URL'))),
-                const SizedBox(width: 8),
-                ElevatedButton(onPressed: () {
+              ),
+              const SizedBox(width: 8),
+              PopupMenuButton(
+                icon: const Icon(Icons.add_circle),
+                tooltip: 'More options',
+                onSelected: (value) {
+                  if (value == 'batch') {
+                    _showBatchImport();
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(
+                    value: 'batch',
+                    child: ListTile(
+                      leading: Icon(Icons.playlist_add),
+                      title: Text('Batch Import'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+            ]),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
                   final url = _urlController.text.trim();
                   if (url.isNotEmpty) _addDownload(url);
-                }, child: const Text('Download'))
-              ]),
-              const SizedBox(height: 12),
-              Expanded(child: ListView.builder(
-                itemCount: _queue.length,
-                itemBuilder: (context, i) {
-                  final item = _queue[i];
-                  return Card(
-                    child: ListTile(
-                      title: Text(item.filename),
-                      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(item.url, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 6),
-                        LinearProgressIndicator(value: (item.progress / 100.0).clamp(0.0, 1.0)),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('${item.progress}% • ${item.status}'),
-                            if (item.status == 'downloading')
-                              Text(
-                                '${item.formattedSpeed} • ${item.estimatedTimeRemaining}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                          ],
-                        ),
-                        if (item.status == 'downloading')
-                          Text('${item.formattedSpeed} • ${item.estimatedTimeRemaining}', 
-                            style: Theme.of(context).textTheme.bodySmall),
-                      ]),
-                      trailing: PopupMenuButton<String>(onSelected: (v) async {
-                        if (v == 'pause') await _pauseDownload(item);
-                        if (v == 'resume') await _resumeDownload(item);
-                        if (v == 'cancel') await _cancelDownload(item);
-                      }, itemBuilder: (ctx) => const [
-                        PopupMenuItem(value: 'pause', child: Text('Pause')),
-                        PopupMenuItem(value: 'resume', child: Text('Resume')),
-                        PopupMenuItem(value: 'cancel', child: Text('Cancel')),
-                      ]),
-                    ),
-                  );
                 },
-              ))
-            ],
-          ),
+                icon: const Icon(Icons.download),
+                label: const Text('Download'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Scheduler status
+            if (_scheduler.queuedCount > 0)
+              Card(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Scheduled: ${_scheduler.queuedCount} downloads in queue',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _queue.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.cloud_download,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No active downloads',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Enter a URL or use batch import',
+                            style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _queue.length,
+                      itemBuilder: (context, i) {
+                        final item = _queue[i];
+                        return Card(
+                          child: ListTile(
+                            title: Text(item.filename, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(item.url, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                              const SizedBox(height: 6),
+                              LinearProgressIndicator(value: (item.progress / 100.0).clamp(0.0, 1.0)),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('${item.progress}% • ${item.status}'),
+                                  if (item.status == 'downloading')
+                                    Text(
+                                      '${item.formattedSpeed} • ${item.estimatedTimeRemaining}',
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                ],
+                              ),
+                            ]),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (v) async {
+                                if (v == 'pause') await _pauseDownload(item);
+                                if (v == 'resume') await _resumeDownload(item);
+                                if (v == 'cancel') await _cancelDownload(item);
+                              },
+                              itemBuilder: (ctx) => const [
+                                PopupMenuItem(value: 'pause', child: Text('Pause')),
+                                PopupMenuItem(value: 'resume', child: Text('Resume')),
+                                PopupMenuItem(value: 'cancel', child: Text('Cancel')),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );
