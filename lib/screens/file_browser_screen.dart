@@ -16,7 +16,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   List<FileSystemEntity> _files = [];
   String? _currentPath;
   final List<String> _pathHistory = [];
-  final Map<String, String> _fileSizes = {};
+  Map<String, String> _fileSizes = {};
 
   @override
   void initState() {
