@@ -21,7 +21,8 @@ class _DownloadHistoryScreenState extends State<DownloadHistoryScreen> {
   }
 
   Future<void> _loadHistory() async {
-    final history = await _databaseService.getDownloadHistory();
+    final historyMaps = await _databaseService.getDownloadHistory();
+    final history = historyMaps.map((map) => DownloadItem.fromMap(map)).toList();
     setState(() {
       _history = history;
     });
