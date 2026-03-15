@@ -30,7 +30,8 @@ class DownloadService {
     _connectivitySub = _connectivity.onConnectivityChanged.listen(_handleConnectivityChange);
   }
 
-  void _handleConnectivityChange(ConnectivityResult result) {
+  void _handleConnectivityChange(List<ConnectivityResult> results) {
+    final result = results.isNotEmpty ? results.first : ConnectivityResult.none;
     if (_isWifiOnly && result != ConnectivityResult.wifi) {
       // Pause all downloads if wifi-only is enabled and we're not on wifi
       pauseAllDownloads();
@@ -43,7 +44,8 @@ class DownloadService {
   Future<void> setWifiOnlyMode(bool wifiOnly) async {
     _isWifiOnly = wifiOnly;
     if (wifiOnly) {
-      final connectivity = await _connectivity.checkConnectivity();
+      final results = await _connectivity.checkConnectivity();
+      final connectivity = results.isNotEmpty ? results.first : ConnectivityResult.none;
       if (connectivity != ConnectivityResult.wifi) {
         await pauseAllDownloads();
       }
@@ -60,7 +62,8 @@ class DownloadService {
 
   Future<void> resumeAllDownloads() async {
     if (_isWifiOnly) {
-      final connectivity = await _connectivity.checkConnectivity();
+      final results = await _connectivity.checkConnectivity();
+      final connectivity = results.isNotEmpty ? results.first : ConnectivityResult.none;
       if (connectivity != ConnectivityResult.wifi) {
         return; // Don't resume if we're not on wifi in wifi-only mode
       }

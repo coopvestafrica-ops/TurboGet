@@ -16,6 +16,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   List<FileSystemEntity> _files = [];
   String? _currentPath;
   final List<String> _pathHistory = [];
+  final Map<String, String> _fileSizes = {};
 
   @override
   void initState() {
@@ -58,9 +59,30 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
       return a.path.toLowerCase().compareTo(b.path.toLowerCase());
     });
 
+    // Pre-compute file sizes
+    final fileSizes = <String, String>{};
+    for (final file in files) {
+      if (file is File) {
+        try {
+          final stat = await file.stat();
+          fileSizes[file.path] = _formatSizeSync(stat.size);
+        } catch (e) {
+          fileSizes[file.path] = 'Unknown';
+        }
+      }
+    }
+
     setState(() {
       _files = files;
+      _fileSizes = fileSizes;
     });
+  }
+
+  String _formatSizeSync(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   void _navigateToFolder(String path) {
@@ -145,7 +167,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                           color: isDirectory ? Colors.amber : _getFileColor(name),
                         ),
                         title: Text(name),
-                        subtitle: isDirectory ? null : Text(_formatFileSize(file)),
+                        subtitle: isDirectory ? null : Text(_fileSizes[file.path] ?? 'Loading...'),
                         trailing: isDirectory
                             ? const Icon(Icons.chevron_right)
                             : PopupMenuButton(
@@ -315,9 +337,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     }
   }
 
-  String _formatFileSize(FileSystemEntity file) {
+  Future<String> _formatFileSize(FileSystemEntity file) async {
     try {
-      final stat = file.stat();
+      final stat = await file.stat();
       final size = stat.size;
       if (size < 1024) return '$size B';
       if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';

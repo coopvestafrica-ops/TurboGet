@@ -21,9 +21,9 @@ class DownloadScheduler {
   Function(String)? onSchedulerStatusChanged;
 
   Future<void> initialize() async {
-    // Check connectivity    final
- connectivityResult = await _connectivity.checkConnectivity();
-    _isWifiConnected = connectivityResult.contains(ConnectivityResult.wifi);
+    // Check connectivity
+    final results = await _connectivity.checkConnectivity();
+    _isWifiConnected = results.contains(ConnectivityResult.wifi);
 
     // Listen for connectivity changes
     _connectivity.onConnectivityChanged.listen((results) {

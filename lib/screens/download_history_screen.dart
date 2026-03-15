@@ -211,7 +211,8 @@ class _HistoryTile extends StatelessWidget {
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  String _formatSize(int bytes) {
+  String _formatSize(int? bytes) {
+    if (bytes == null) return 'Unknown';
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';

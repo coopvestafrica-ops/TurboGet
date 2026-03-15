@@ -172,6 +172,35 @@ class DatabaseService {
     );
   }
 
+  // History operations - returns completed, failed, and cancelled downloads
+  Future<List<Map<String, dynamic>>> getDownloadHistory() async {
+    final db = await database;
+    return await db.query(
+      'downloads',
+      where: 'status IN (?, ?, ?)',
+      whereArgs: ['completed', 'failed', 'cancelled'],
+      orderBy: 'created_at DESC',
+    );
+  }
+
+  Future<void> deleteDownloadHistory(String id) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Delete segments first due to foreign key constraint
+      await txn.delete(
+        'download_segments',
+        where: 'download_id = ?',
+        whereArgs: [id],
+      );
+      // Then delete the download
+      await txn.delete(
+        'downloads',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+  }
+
   Future<void> deleteDownload(String id) async {
     final db = await database;
     await db.transaction((txn) async {
