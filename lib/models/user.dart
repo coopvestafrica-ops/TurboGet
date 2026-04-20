@@ -1,13 +1,26 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+
 enum UserRole {
   superAdmin,
   registeredUser,
-  guest
+  guest,
 }
 
+/// Represents an authenticated user of the app.
+///
+/// Passwords are stored as a SHA-256 hash with a per-user salt; the raw
+/// password is only ever held transiently during login/creation.
 class User {
   final String id;
   final String? username;
-  final String password;
+
+  /// SHA-256 hash of `salt + password`, hex-encoded.
+  final String passwordHash;
+
+  /// Random per-user salt, hex-encoded.
+  final String passwordSalt;
+
   final UserRole role;
   final DateTime createdAt;
   final String? createdBy;
@@ -15,45 +28,69 @@ class User {
   const User({
     required this.id,
     this.username,
-    required this.password,
+    required this.passwordHash,
+    required this.passwordSalt,
     required this.role,
     required this.createdAt,
     this.createdBy,
   });
 
   bool get isAdmin => role == UserRole.superAdmin;
+  bool get isGuest => role == UserRole.guest;
   bool get shouldShowAds => role == UserRole.guest;
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'username': username,
-      'password': password,
-      'role': role.toString().split('.').last,
-      'createdAt': createdAt.toIso8601String(),
-      'createdBy': createdBy,
-    };
+  /// Returns `true` if [password] matches this user's stored hash.
+  bool verifyPassword(String password) {
+    final computed = hashPassword(password, passwordSalt);
+    return computed == passwordHash;
   }
+
+  /// Hashes `password` with `salt` using SHA-256.
+  static String hashPassword(String password, String salt) {
+    final bytes = utf8.encode('$salt:$password');
+    return sha256.convert(bytes).toString();
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'username': username,
+        'passwordHash': passwordHash,
+        'passwordSalt': passwordSalt,
+        'role': role.name,
+        'createdAt': createdAt.toIso8601String(),
+        'createdBy': createdBy,
+      };
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'],
-      username: json['username'],
-      password: json['password'],
+      id: json['id'] as String,
+      username: json['username'] as String?,
+      passwordHash: json['passwordHash'] as String? ?? '',
+      passwordSalt: json['passwordSalt'] as String? ?? '',
       role: UserRole.values.firstWhere(
-        (e) => e.toString() == 'UserRole.${json['role']}',
+        (e) => e.name == json['role'],
         orElse: () => UserRole.guest,
       ),
-      createdAt: DateTime.parse(json['createdAt']),
-      createdBy: json['createdBy'],
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      createdBy: json['createdBy'] as String?,
     );
   }
 
-  static User get superAdmin => User(
-    id: 'super_admin',
-    username: 'Teejayfpi',
-    password: 'Temiloluwa@1963',
-    role: UserRole.superAdmin,
-    createdAt: DateTime(2025),
-  );
+  User copyWith({
+    String? username,
+    String? passwordHash,
+    String? passwordSalt,
+    UserRole? role,
+  }) {
+    return User(
+      id: id,
+      username: username ?? this.username,
+      passwordHash: passwordHash ?? this.passwordHash,
+      passwordSalt: passwordSalt ?? this.passwordSalt,
+      role: role ?? this.role,
+      createdAt: createdAt,
+      createdBy: createdBy,
+    );
+  }
 }

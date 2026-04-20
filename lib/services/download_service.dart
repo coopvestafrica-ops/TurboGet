@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -56,7 +57,7 @@ class DownloadService {
     try {
       await _method.invokeMethod('pauseAllDownloads');
     } catch (e) {
-      print('Error pausing downloads: $e');
+      debugPrint('Error pausing downloads: $e');
     }
   }
 
@@ -72,7 +73,7 @@ class DownloadService {
     try {
       await _method.invokeMethod('resumeAllDownloads');
     } catch (e) {
-      print('Error resuming downloads: $e');
+      debugPrint('Error resuming downloads: $e');
     }
   }
 

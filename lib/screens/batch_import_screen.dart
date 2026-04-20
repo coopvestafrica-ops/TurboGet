@@ -13,7 +13,6 @@ class BatchImportScreen extends StatefulWidget {
 class _BatchImportScreenState extends State<BatchImportScreen> {
   final _controller = TextEditingController();
   List<String> _urls = [];
-  bool _isLoading = false;
 
   @override
   void dispose() {

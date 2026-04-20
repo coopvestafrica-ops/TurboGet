@@ -1,30 +1,60 @@
-// This is a basic Flutter widget test.
+// Smoke tests for the TurboGet app.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// These tests exercise the building blocks that do not require a real
+// Android host: the user model's password hashing and the first-run
+// setup screen (reached when no super-admin exists). Anything that
+// depends on MethodChannel plugins (downloads, AdMob, DB) is out of
+// scope for widget tests.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:turboget/main.dart';
+import 'package:turboget/models/user.dart';
+import 'package:turboget/screens/first_run_setup_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('User.hashPassword', () {
+    test('produces the same hash for the same salt + password', () {
+      final a = User.hashPassword('hunter2', 'abc');
+      final b = User.hashPassword('hunter2', 'abc');
+      expect(a, equals(b));
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('differs across salts', () {
+      final a = User.hashPassword('hunter2', 'abc');
+      final b = User.hashPassword('hunter2', 'xyz');
+      expect(a, isNot(equals(b)));
+    });
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  group('User.verifyPassword', () {
+    test('accepts the correct password', () {
+      const salt = 'salt-123';
+      final u = User(
+        id: 'u1',
+        username: 'admin',
+        passwordHash: User.hashPassword('correct horse', salt),
+        passwordSalt: salt,
+        role: UserRole.superAdmin,
+        createdAt: DateTime.now(),
+      );
+      expect(u.verifyPassword('correct horse'), isTrue);
+      expect(u.verifyPassword('wrong'), isFalse);
+    });
+  });
+
+  testWidgets('First-run setup screen renders and validates input',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: FirstRunSetupScreen()),
+    );
+
+    expect(find.text('Create the admin account'), findsOneWidget);
+    expect(find.text('Create admin account'), findsOneWidget);
+
+    // Tapping submit with empty fields should surface validation errors.
+    await tester.tap(find.text('Create admin account'));
     await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Username is required'), findsOneWidget);
   });
 }

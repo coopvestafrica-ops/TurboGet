@@ -3,7 +3,9 @@ import '../models/download_item.dart';
 import '../services/database_service.dart';
 
 class DownloadHistoryScreen extends StatefulWidget {
-  const DownloadHistoryScreen({super.key});
+  final Future<void> Function(String url)? onRedownload;
+
+  const DownloadHistoryScreen({super.key, this.onRedownload});
 
   @override
   State<DownloadHistoryScreen> createState() => _DownloadHistoryScreenState();
@@ -85,11 +87,22 @@ class _DownloadHistoryScreenState extends State<DownloadHistoryScreen> {
                     await _databaseService.deleteDownloadHistory(item.id);
                     _loadHistory();
                   },
-                  onRedownload: () {
-                    // TODO: Trigger redownload
+                  onRedownload: () async {
+                    final onRedownload = widget.onRedownload;
+                    if (onRedownload == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Re-download is not available here'),
+                        ),
+                      );
+                      return;
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Adding to download queue...')),
+                      SnackBar(
+                        content: Text('Re-queuing ${item.filename}…'),
+                      ),
                     );
+                    await onRedownload(item.url);
                   },
                 );
               },

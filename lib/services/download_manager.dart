@@ -18,7 +18,7 @@ class DownloadManager {
 
   Stream<DownloadItem> get downloadUpdates => _downloadController.stream;
 
-  Future<void> addDownload(String url, {String? filename, VideoQuality? quality}) async {
+  Future<void> addDownload(String url, {String? filename, PlatformVideoQuality? quality}) async {
     try {
       // First analyze the platform and get metadata
       final platform = await _platformAnalyzer.detectPlatform(url);
@@ -29,7 +29,7 @@ class DownloadManager {
       final id = DateTime.now().millisecondsSinceEpoch.toString();
 
       // For video platforms, get available qualities if not specified
-      List<VideoQuality>? qualities;
+      List<PlatformVideoQuality>? qualities;
       if (platform == PlatformType.youtube || 
           platform == PlatformType.vimeo || 
           platform == PlatformType.dailymotion) {
@@ -102,14 +102,14 @@ class DownloadManager {
       _activeDownloads[item.id] = progressStream.listen(
         (progress) async {
           // Update download progress
-          final updates = {
+          final updates = <String, dynamic>{
             'downloaded_size': progress.downloadedBytes,
             'total_size': progress.totalBytes,
             'progress': (progress.progress * 100).round(),
           };
 
           if (progress.isComplete) {
-            updates['status'] = 2; // Assuming 2 represents 'completed' status as int
+            updates['status'] = 'completed';
           }
 
           await _db.updateDownload(item.id, updates);

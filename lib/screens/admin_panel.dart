@@ -20,49 +20,50 @@ class _AdminPanelState extends State<AdminPanel> {
   }
 
   Future<void> _createUser() async {
-    if (_usernameController.text.isEmpty) {
+    final username = _usernameController.text.trim();
+    if (username.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a username for the new user')),
+        const SnackBar(content: Text('Please enter a username')),
       );
       return;
     }
 
     try {
-      final user = await _authService.createUser(_usernameController.text);
+      final result = await _authService.createUser(username: username);
       _usernameController.clear();
-      
       if (!mounted) return;
-      
-      showDialog(
+
+      await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (ctx) => AlertDialog(
           title: const Text('User Created'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Username: ${user.username}'),
+              Text('Username: ${result.user.username ?? ''}'),
               const SizedBox(height: 8),
-              Text('Password: ${user.password}'),
+              SelectableText('Password: ${result.password}'),
               const SizedBox(height: 16),
               const Text(
-                'Please save this password! It cannot be retrieved later.',
+                'Please save this password — it cannot be retrieved later.',
                 style: TextStyle(color: Colors.red),
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('OK'),
             ),
           ],
         ),
       );
+      if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }
@@ -70,27 +71,34 @@ class _AdminPanelState extends State<AdminPanel> {
   Future<void> _deleteUser(User user) async {
     try {
       await _authService.deleteUser(user.id);
+      if (!mounted) return;
       setState(() {});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final users = _authService.users
+        .where((u) => u.role != UserRole.superAdmin)
+        .toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Panel'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
             onPressed: () async {
+              final navigator = Navigator.of(context);
               await _authService.logout();
               if (!mounted) return;
-              Navigator.of(context).pop();
+              navigator.pop();
             },
           ),
         ],
@@ -107,7 +115,7 @@ class _AdminPanelState extends State<AdminPanel> {
                     controller: _usernameController,
                     decoration: const InputDecoration(
                       labelText: 'Username',
-                      hintText: 'Enter username for new user',
+                      hintText: 'Username for new user',
                     ),
                   ),
                 ),
@@ -119,35 +127,32 @@ class _AdminPanelState extends State<AdminPanel> {
               ],
             ),
             const SizedBox(height: 32),
-            const Text(
-              'Registered Users',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+            Text(
+              'Registered Users (${users.length})',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
-                itemCount: _authService.users.length,
-                itemBuilder: (context, index) {
-                  final user = _authService.users[index];
-                  if (user.role == UserRole.superAdmin) return const SizedBox();
-                  
-                  return Card(
-                    child: ListTile(
-                      title: Text(user.username ?? 'Unnamed User'),
-                      subtitle: Text(
-                        'Created: ${user.createdAt.toLocal().toString().split('.')[0]}'
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () => _deleteUser(user),
-                      ),
+              child: users.isEmpty
+                  ? const Center(child: Text('No registered users yet'))
+                  : ListView.builder(
+                      itemCount: users.length,
+                      itemBuilder: (context, index) {
+                        final user = users[index];
+                        return Card(
+                          child: ListTile(
+                            title: Text(user.username ?? 'Unnamed User'),
+                            subtitle: Text(
+                              'Created: ${user.createdAt.toLocal().toString().split('.').first}',
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _deleteUser(user),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
           ],
         ),

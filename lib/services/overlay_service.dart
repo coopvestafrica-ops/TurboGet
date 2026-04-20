@@ -17,7 +17,7 @@ class OverlayService {
       final bool hasPermission = await platform.invokeMethod('requestOverlayPermission');
       return hasPermission;
     } catch (e) {
-      print('Failed to get overlay permission: $e');
+      debugPrint('Failed to get overlay permission: $e');
       return false;
     }
   }
@@ -105,7 +105,7 @@ class _DownloadOverlay extends StatelessWidget {
           width: 280,
           padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.8),
+            color: Colors.black.withValues(alpha: 0.8),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(

@@ -12,7 +12,6 @@ class FileBrowserScreen extends StatefulWidget {
 }
 
 class _FileBrowserScreenState extends State<FileBrowserScreen> {
-  Directory? _downloadDir;
   List<FileSystemEntity> _files = [];
   String? _currentPath;
   final List<String> _pathHistory = [];
@@ -337,16 +336,4 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     }
   }
 
-  Future<String> _formatFileSize(FileSystemEntity file) async {
-    try {
-      final stat = await file.stat();
-      final size = stat.size;
-      if (size < 1024) return '$size B';
-      if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
-      if (size < 1024 * 1024 * 1024) return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
-      return '${(size / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-    } catch (e) {
-      return 'Unknown';
-    }
-  }
 }

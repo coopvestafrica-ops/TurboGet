@@ -1,14 +1,12 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/download_item.dart';
-import '../services/database_service.dart';
 
 class CloudBackupService {
   static CloudBackupService? _instance;
   static CloudBackupService get instance => _instance ??= CloudBackupService._();
   CloudBackupService._();
 
-  final _databaseService = DatabaseService();
   String? _lastBackupDate;
 
   // In a real app, you'd use Firebase, AWS, or your own backend
