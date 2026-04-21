@@ -109,7 +109,7 @@ class DownloaderPlugin :
                 }
                 handles[id]?.control?.let {
                     it.paused = false
-                    synchronized(it.lock) { it.lock.notifyAll() }
+                    synchronized(it.lock) { (it.lock as Object).notifyAll() }
                 }
                 result.success(true)
             }
@@ -119,7 +119,7 @@ class DownloaderPlugin :
                 }
                 handles[id]?.let {
                     it.control.cancelled = true
-                    synchronized(it.control.lock) { it.control.lock.notifyAll() }
+                    synchronized(it.control.lock) { (it.control.lock as Object).notifyAll() }
                 }
                 result.success(true)
             }
@@ -146,7 +146,7 @@ class DownloaderPlugin :
         // coroutine scope down so sockets and files are released cleanly.
         handles.values.forEach {
             it.control.cancelled = true
-            synchronized(it.control.lock) { it.control.lock.notifyAll() }
+            synchronized(it.control.lock) { (it.control.lock as Object).notifyAll() }
         }
         handles.clear()
         scope.cancel()
