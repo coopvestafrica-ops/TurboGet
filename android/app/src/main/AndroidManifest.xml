@@ -46,9 +46,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- AdMob app ID. Replace with your production app ID before release. -->
+        <!-- AdMob disabled until monetization is enabled. Flip the
+             `kAdsEnabled` constant in lib/main.dart and replace the value
+             below with your production AdMob app ID before shipping ads. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-0000000000000000~0000000000"/>
     </application>
 </manifest>

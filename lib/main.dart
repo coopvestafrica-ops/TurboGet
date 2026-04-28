@@ -18,10 +18,14 @@ import 'screens/download_history_screen.dart';
 import 'screens/file_browser_screen.dart';
 import 'screens/batch_import_screen.dart';
 
+/// Master switch for AdMob. Flip to `true` (and re-add
+/// `AdManager().initialize()` to `main`) when monetization is ready.
+const bool kAdsEnabled = false;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Future.wait([
-    AdManager().initialize(),
+  await Future.wait<void>([
+    if (kAdsEnabled) AdManager().initialize(),
     AuthService.instance.initialize(),
     SettingsManager().initialize(),
     ThemeService.instance.initialize(),
@@ -82,7 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
   BannerAd? _bannerAd;
   int _downloadCount = 0;
 
-  bool get _shouldShowAds => _authService.currentUser?.shouldShowAds ?? true;
+  bool get _shouldShowAds =>
+      kAdsEnabled && (_authService.currentUser?.shouldShowAds ?? true);
 
   Timer? _clipboardCheckTimer;
   String? _lastClipboardSuggestion;
