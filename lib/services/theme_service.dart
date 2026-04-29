@@ -1,10 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'settings_manager.dart';
 
 /// App theming. Extends [ChangeNotifier] so UI wrapped in a
 /// [ListenableBuilder] rebuilds when the theme changes at runtime.
+///
+/// Reads the seed/accent color from [SettingsManager] so the user can
+/// pick their own from Settings → Accent Color and the change applies
+/// across the whole app immediately.
 class ThemeService extends ChangeNotifier {
+  /// Public hook so screens that mutate global state outside this
+  /// service (e.g. the locale picker in Settings) can ask
+  /// [MaterialApp] to rebuild.
+  @override
+  void notifyListeners() => super.notifyListeners();
+
   static const String _themeKey = 'theme_mode';
+  static const Color defaultSeed = Colors.blue;
+
+  /// Curated accent palette shown in Settings → Accent color.
+  static const List<Color> accentPalette = <Color>[
+    Colors.blue,
+    Colors.indigo,
+    Colors.deepPurple,
+    Colors.teal,
+    Colors.green,
+    Colors.amber,
+    Colors.deepOrange,
+    Colors.pink,
+    Colors.red,
+  ];
 
   static ThemeService? _instance;
   static ThemeService get instance => _instance ??= ThemeService._();
@@ -12,6 +37,19 @@ class ThemeService extends ChangeNotifier {
 
   ThemeMode _themeMode = ThemeMode.system;
   ThemeMode get themeMode => _themeMode;
+
+  Color get seedColor {
+    final raw = SettingsManager().accentColorValue;
+    return raw != null ? Color(raw) : defaultSeed;
+  }
+
+  Future<void> setSeedColor(Color color) async {
+    SettingsManager().accentColorValue = (color.a * 255).round() << 24
+        | (color.r * 255).round() << 16
+        | (color.g * 255).round() << 8
+        | (color.b * 255).round();
+    notifyListeners();
+  }
 
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
@@ -37,7 +75,7 @@ class ThemeService extends ChangeNotifier {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.blue,
+        seedColor: seedColor,
         brightness: brightness,
       ),
       appBarTheme: const AppBarTheme(

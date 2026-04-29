@@ -60,7 +60,11 @@ class AuthService {
 
   /// Creates the first super-admin account. Called from the first-run
   /// setup screen. Throws if a super-admin already exists.
-  Future<User> createSuperAdmin({
+  ///
+  /// Returns the created admin and the plain-text recovery code so the
+  /// UI can show it once. The recovery code is **not** retrievable
+  /// later — it's stored only as a salted hash.
+  Future<({User user, String recoveryCode})> createSuperAdmin({
     required String username,
     required String password,
   }) async {
@@ -69,6 +73,8 @@ class AuthService {
     }
     _validatePassword(password);
     final salt = _randomSalt();
+    final recoveryCode = _generateRecoveryCode();
+    final recoverySalt = _randomSalt();
     final admin = User(
       id: 'super_admin',
       username: username.trim(),
@@ -76,13 +82,54 @@ class AuthService {
       passwordSalt: salt,
       role: UserRole.superAdmin,
       createdAt: DateTime.now(),
+      recoveryHash: User.hashPassword(recoveryCode, recoverySalt),
+      recoverySalt: recoverySalt,
     );
     _users.add(admin);
     _currentUser = admin;
     await _saveUsers();
     await _saveCurrentUser();
-    return admin;
+    return (user: admin, recoveryCode: recoveryCode);
   }
+
+  /// Resets the super-admin password using a previously issued
+  /// recovery code. Returns `true` on success.
+  Future<bool> resetSuperAdminPasswordWithRecoveryCode({
+    required String recoveryCode,
+    required String newPassword,
+  }) async {
+    _validatePassword(newPassword);
+    final adminIdx = _users.indexWhere(
+      (u) => u.role == UserRole.superAdmin,
+    );
+    if (adminIdx == -1) return false;
+    final admin = _users[adminIdx];
+    if (!admin.verifyRecoveryCode(recoveryCode)) return false;
+    final salt = _randomSalt();
+    final newRecoveryCode = _generateRecoveryCode();
+    final newRecoverySalt = _randomSalt();
+    _users[adminIdx] = admin.copyWith(
+      passwordHash: User.hashPassword(newPassword, salt),
+      passwordSalt: salt,
+      // Issue a new recovery code so the previous one can't be reused.
+      recoveryHash: User.hashPassword(newRecoveryCode, newRecoverySalt),
+      recoverySalt: newRecoverySalt,
+    );
+    _lastIssuedRecoveryCode = newRecoveryCode;
+    if (_currentUser?.id == admin.id) _currentUser = _users[adminIdx];
+    await _saveUsers();
+    return true;
+  }
+
+  /// The most recently issued recovery code from
+  /// [resetSuperAdminPasswordWithRecoveryCode]. Cleared after read.
+  String? takeLastIssuedRecoveryCode() {
+    final code = _lastIssuedRecoveryCode;
+    _lastIssuedRecoveryCode = null;
+    return code;
+  }
+
+  String? _lastIssuedRecoveryCode;
 
   /// Logs in a user by `username` + `password`. Returns the authenticated
   /// [User] or `null` if credentials are invalid.
@@ -217,6 +264,21 @@ class AuthService {
         'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final rng = Random.secure();
     return List.generate(12, (_) => chars[rng.nextInt(chars.length)]).join();
+  }
+
+  /// Generates a human-friendly recovery code, formatted as four
+  /// 4-character groups separated by dashes (e.g. `7K2P-9MX4-Q3RT-LZ8N`).
+  /// Uses an alphabet without easily confused characters.
+  String _generateRecoveryCode() {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    final rng = Random.secure();
+    final groups = <String>[];
+    for (var g = 0; g < 4; g++) {
+      groups.add(
+        List.generate(4, (_) => chars[rng.nextInt(chars.length)]).join(),
+      );
+    }
+    return groups.join('-');
   }
 
   String _randomSalt() {

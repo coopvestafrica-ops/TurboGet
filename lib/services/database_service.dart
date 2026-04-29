@@ -18,12 +18,20 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'turboget.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
-        if (oldVersion == 1) {
+        if (oldVersion < 2) {
           // Add resume_data and metadata columns
           await db.execute('ALTER TABLE downloads ADD COLUMN resume_data TEXT');
           await db.execute('ALTER TABLE downloads ADD COLUMN metadata TEXT');
+        }
+        if (oldVersion < 3) {
+          // Per-user history scoping, integrity hash, queue priority.
+          await db.execute('ALTER TABLE downloads ADD COLUMN owner_user_id TEXT');
+          await db.execute('ALTER TABLE downloads ADD COLUMN sha256 TEXT');
+          await db.execute(
+            'ALTER TABLE downloads ADD COLUMN priority INTEGER NOT NULL DEFAULT 0',
+          );
         }
       },
       onCreate: (Database db, int version) async {
@@ -41,7 +49,10 @@ class DatabaseService {
             download_path TEXT,
             segments JSON,
             error TEXT,
-            metadata JSON
+            metadata JSON,
+            owner_user_id TEXT,
+            sha256 TEXT,
+            priority INTEGER NOT NULL DEFAULT 0
           )
         ''');
 
@@ -158,7 +169,7 @@ class DatabaseService {
       'downloads',
       where: 'status = ?',
       whereArgs: ['queued'],
-      orderBy: 'created_at ASC',
+      orderBy: 'priority ASC, created_at ASC',
     );
   }
 
@@ -166,19 +177,30 @@ class DatabaseService {
     final db = await database;
     return await db.query(
       'downloads',
-      where: 'status = ?',
-      whereArgs: ['downloading'],
-      orderBy: 'created_at ASC',
+      where: 'status IN (?, ?, ?)',
+      whereArgs: ['queued', 'downloading', 'paused'],
+      orderBy: 'priority ASC, created_at ASC',
     );
   }
 
-  // History operations - returns completed, failed, and cancelled downloads
-  Future<List<Map<String, dynamic>>> getDownloadHistory() async {
+  // History operations - returns completed, failed, and cancelled downloads.
+  // If [ownerUserId] is provided, scopes results to that user.
+  Future<List<Map<String, dynamic>>> getDownloadHistory({
+    String? ownerUserId,
+  }) async {
     final db = await database;
+    if (ownerUserId == null) {
+      return await db.query(
+        'downloads',
+        where: 'status IN (?, ?, ?)',
+        whereArgs: ['completed', 'failed', 'cancelled'],
+        orderBy: 'created_at DESC',
+      );
+    }
     return await db.query(
       'downloads',
-      where: 'status IN (?, ?, ?)',
-      whereArgs: ['completed', 'failed', 'cancelled'],
+      where: 'status IN (?, ?, ?) AND (owner_user_id = ? OR owner_user_id IS NULL)',
+      whereArgs: ['completed', 'failed', 'cancelled', ownerUserId],
       orderBy: 'created_at DESC',
     );
   }

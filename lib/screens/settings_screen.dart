@@ -53,6 +53,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showThemeDialog(context),
           ),
+          ListTile(
+            leading: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: _themeService.seedColor,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline,
+                  width: 1,
+                ),
+              ),
+            ),
+            title: const Text('Accent color'),
+            subtitle: const Text('Tap to choose a different palette'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showAccentDialog(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.language),
+            title: const Text('Language'),
+            subtitle: Text(_localeLabel(_settings.localeCode)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showLocaleDialog(context),
+          ),
           const Divider(),
           const _SectionHeader(title: 'Downloads'),
           SwitchListTile(
@@ -99,6 +124,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.speed),
+            title: const Text('Bandwidth limit'),
+            subtitle: Text(_settings.bandwidthKbps == 0
+                ? 'Unlimited'
+                : '${_settings.bandwidthKbps} KB/s'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showBandwidthDialog(context),
           ),
           ListTile(
             leading: const Icon(Icons.folder),
@@ -179,6 +213,148 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case ThemeMode.dark:
         return 'Dark';
     }
+  }
+
+  String _localeLabel(String? code) {
+    switch (code) {
+      case 'en':
+        return 'English';
+      case 'yo':
+        return 'Yorùbá';
+      default:
+        return 'System default';
+    }
+  }
+
+  void _showLocaleDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Choose Language'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in const [
+              MapEntry<String?, String>(null, 'System default'),
+              MapEntry<String?, String>('en', 'English'),
+              MapEntry<String?, String>('yo', 'Yorùbá'),
+            ])
+              ListTile(
+                leading: Icon(
+                  _settings.localeCode == entry.key
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                ),
+                title: Text(entry.value),
+                onTap: () {
+                  setState(() => _settings.localeCode = entry.key);
+                  // Bounce the theme service so MaterialApp rebuilds.
+                  _themeService.notifyListeners();
+                  Navigator.pop(ctx);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAccentDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Accent color'),
+        content: SizedBox(
+          width: 280,
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: ThemeService.accentPalette.map((c) {
+              final selected = _themeService.seedColor.toARGB32() ==
+                  c.toARGB32();
+              return InkWell(
+                onTap: () {
+                  _themeService.setSeedColor(c);
+                  Navigator.pop(ctx);
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: c,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected
+                          ? Theme.of(ctx).colorScheme.onSurface
+                          : Colors.transparent,
+                      width: 3,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(Icons.check, color: Colors.white)
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBandwidthDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        // Slider goes 0..10 MB/s in 100 KB/s steps. 0 means unlimited.
+        var value = _settings.bandwidthKbps.toDouble().clamp(0, 10240);
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: const Text('Bandwidth limit'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value == 0
+                      ? 'Unlimited'
+                      : value < 1024
+                          ? '${value.round()} KB/s'
+                          : '${(value / 1024).toStringAsFixed(1)} MB/s',
+                  style: Theme.of(ctx).textTheme.headlineSmall,
+                ),
+                Slider(
+                  value: value.toDouble(),
+                  min: 0,
+                  max: 10240,
+                  divisions: 102,
+                  label: value == 0 ? 'Unlimited' : '${value.round()} KB/s',
+                  onChanged: (v) => setLocal(() => value = v),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  setState(() {
+                    _settings.bandwidthKbps = value.round();
+                  });
+                  // Push the new limit to any in-flight downloads.
+                  _downloadService.setBandwidthLimit(
+                    _settings.bandwidthBytesPerSecond,
+                  );
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showThemeDialog(BuildContext context) {

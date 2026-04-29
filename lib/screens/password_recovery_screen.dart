@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
-import '../main.dart';
 
-/// Shown the first time the app launches, before any super-admin exists.
-/// Collects a username + password and creates the super-admin account.
-class FirstRunSetupScreen extends StatefulWidget {
-  const FirstRunSetupScreen({super.key});
+/// Lets the super-admin reset their password using the recovery code
+/// shown at first-run setup. On success the new recovery code is
+/// displayed once so it can be saved.
+class PasswordRecoveryScreen extends StatefulWidget {
+  const PasswordRecoveryScreen({super.key});
 
   @override
-  State<FirstRunSetupScreen> createState() => _FirstRunSetupScreenState();
+  State<PasswordRecoveryScreen> createState() => _PasswordRecoveryScreenState();
 }
 
-class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
+class _PasswordRecoveryScreenState extends State<PasswordRecoveryScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _obscure = true;
@@ -22,7 +22,7 @@ class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _codeController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
@@ -32,41 +32,47 @@ class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _submitting = true);
     try {
-      final result = await AuthService.instance.createSuperAdmin(
-        username: _usernameController.text.trim(),
-        password: _passwordController.text,
+      final ok = await AuthService.instance
+          .resetSuperAdminPasswordWithRecoveryCode(
+        recoveryCode: _codeController.text,
+        newPassword: _passwordController.text,
       );
       if (!mounted) return;
-      await _showRecoveryCode(result.recoveryCode);
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Recovery code is incorrect')),
+        );
+        return;
+      }
+      final newCode = AuthService.instance.takeLastIssuedRecoveryCode();
+      if (newCode != null) {
+        await _showNewCode(newCode);
+      }
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Setup failed: $e')),
+        SnackBar(content: Text('Reset failed: $e')),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
-  /// Displays the one-time recovery code and forces the user to
-  /// acknowledge they've stored it before continuing.
-  Future<void> _showRecoveryCode(String code) {
+  Future<void> _showNewCode(String code) {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Save your recovery code'),
+        title: const Text('Password reset successful'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'You will need this code if you ever forget your password. '
-              'Store it somewhere safe — it cannot be recovered later.',
+              'Here is your new recovery code. Save it now — the old one '
+              'no longer works.',
             ),
             const SizedBox(height: 16),
             Container(
@@ -114,37 +120,31 @@ class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Welcome to TurboGet')),
+      appBar: AppBar(title: const Text('Forgot password')),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           child: Form(
             key: _formKey,
             child: ListView(
               children: [
-                const SizedBox(height: 16),
-                Text(
-                  'Create the admin account',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
                 const Text(
-                  'This is the first time TurboGet has run on this device. '
-                  'Choose a username and password for the super-admin account. '
-                  'You can create additional users from the admin panel later.',
+                  'Enter the recovery code shown when you first set up '
+                  'TurboGet, then choose a new password.',
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 TextFormField(
-                  controller: _usernameController,
+                  controller: _codeController,
                   decoration: const InputDecoration(
-                    labelText: 'Admin username',
-                    prefixIcon: Icon(Icons.person),
+                    labelText: 'Recovery code',
+                    prefixIcon: Icon(Icons.vpn_key),
+                    hintText: 'XXXX-XXXX-XXXX-XXXX',
                   ),
-                  autofillHints: const [AutofillHints.newUsername],
+                  textCapitalization: TextCapitalization.characters,
                   validator: (v) {
-                    final t = (v ?? '').trim();
-                    if (t.isEmpty) return 'Username is required';
-                    if (t.length < 3) return 'At least 3 characters';
+                    if ((v ?? '').trim().isEmpty) {
+                      return 'Recovery code is required';
+                    }
                     return null;
                   },
                 ),
@@ -152,18 +152,16 @@ class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
                 TextFormField(
                   controller: _passwordController,
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: 'New password',
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(_obscure
                           ? Icons.visibility
                           : Icons.visibility_off),
-                      onPressed: () =>
-                          setState(() => _obscure = !_obscure),
+                      onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
                   obscureText: _obscure,
-                  autofillHints: const [AutofillHints.newPassword],
                   validator: (v) {
                     if (v == null || v.length < 6) {
                       return 'Password must be at least 6 characters';
@@ -175,7 +173,7 @@ class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
                 TextFormField(
                   controller: _confirmController,
                   decoration: const InputDecoration(
-                    labelText: 'Confirm password',
+                    labelText: 'Confirm new password',
                     prefixIcon: Icon(Icons.lock_outline),
                   ),
                   obscureText: _obscure,
@@ -195,8 +193,8 @@ class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.check),
-                  label: const Text('Create admin account'),
+                      : const Icon(Icons.lock_reset),
+                  label: const Text('Reset password'),
                 ),
               ],
             ),

@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'l10n/app_localizations.dart';
 import 'services/ad_manager.dart';
 import 'services/auth_service.dart';
+import 'services/database_service.dart';
 import 'services/settings_manager.dart';
 import 'services/theme_service.dart';
 import 'services/download_scheduler.dart';
@@ -17,6 +21,7 @@ import 'screens/settings_screen.dart';
 import 'screens/download_history_screen.dart';
 import 'screens/file_browser_screen.dart';
 import 'screens/batch_import_screen.dart';
+import 'widgets/conflict_dialog.dart';
 
 /// Master switch for AdMob. Flip to `true` (and re-add
 /// `AdManager().initialize()` to `main`) when monetization is ready.
@@ -44,12 +49,21 @@ class MyApp extends StatelessWidget {
       listenable: ThemeService.instance,
       builder: (context, _) {
         final theme = ThemeService.instance;
+        final localeCode = SettingsManager().localeCode;
         return MaterialApp(
           title: 'TurboGet',
           debugShowCheckedModeBanner: false,
           theme: theme.lightTheme,
           darkTheme: theme.darkTheme,
           themeMode: theme.themeMode,
+          locale: localeCode != null ? Locale(localeCode) : null,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           home: AuthService.instance.needsInitialSetup
               ? const FirstRunSetupScreen()
               : const HomeScreen(),
@@ -82,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _adManager = AdManager();
   final _scheduler = DownloadScheduler.instance;
   final _settings = SettingsManager();
+  final _db = DatabaseService();
 
   BannerAd? _bannerAd;
   int _downloadCount = 0;
@@ -95,11 +110,34 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _restoreQueue();
     _startListening();
     _initAds();
     _initClipboardMonitor();
     _initShareHandler();
     _initScheduler();
+  }
+
+  /// Loads any unfinished downloads from the DB and shows them as
+  /// `paused` so the user can resume manually after relaunching the
+  /// app. We don't auto-resume because the OS may have killed our
+  /// process and the underlying URL might have expired (e.g. signed
+  /// CDN tokens).
+  Future<void> _restoreQueue() async {
+    try {
+      final rows = await _db.getActiveDownloads();
+      if (rows.isEmpty) return;
+      final restored = <DownloadItem>[];
+      for (final row in rows) {
+        final item = DownloadItem.fromMap(row);
+        if (item.status == 'downloading') item.status = 'paused';
+        restored.add(item);
+      }
+      if (!mounted) return;
+      setState(() => _queue.addAll(restored));
+    } catch (e) {
+      debugPrint('Failed to restore queue: $e');
+    }
   }
 
   void _initAds() {
@@ -146,6 +184,17 @@ class _HomeScreenState extends State<HomeScreen> {
             if (event['total_size'] != null || event['total'] != null) {
               item.totalSize =
                   (event['total_size'] ?? event['total']) as int?;
+            }
+
+            // Persist progress at most once a second, plus on terminal
+            // status changes — we don't want to thrash sqlite.
+            if (status == 'completed' ||
+                status == 'failed' ||
+                status == 'cancelled' ||
+                progress % 5 == 0) {
+              _db.updateDownload(item.id, item.toMap()).catchError(
+                    (e) => debugPrint('persist error: $e'),
+                  );
             }
 
             if (status == 'completed' || status == 'complete') {
@@ -254,27 +303,72 @@ class _HomeScreenState extends State<HomeScreen> {
     return path;
   }
 
-  String _idFromUrl(String url) => url.hashCode.toString();
+  String _idFromUrl(String url) =>
+      '${url.hashCode}_${DateTime.now().millisecondsSinceEpoch}';
 
-  Future<void> _addDownload(String url) async {
+  /// Returns a destination filename that doesn't already exist, by
+  /// asking the user via [showConflictDialog] when a collision is
+  /// detected. Returns `null` if the user picked Skip.
+  Future<String?> _resolveFilename(String dirPath, String filename) async {
+    final exists = await File('$dirPath/$filename').exists();
+    if (!exists) return filename;
+    if (!mounted) return null;
+    final action = await showConflictDialog(context, filename);
+    if (action == null || action == ConflictAction.skip) return null;
+    if (action == ConflictAction.overwrite) {
+      // Best effort: drop any sidecar or stale file.
+      try {
+        await File('$dirPath/$filename').delete();
+        await File('$dirPath/$filename.tg.json').delete();
+      } catch (_) {}
+      return filename;
+    }
+    // rename: pick the next free numbered variant ("foo (1).bin").
+    final dot = filename.lastIndexOf('.');
+    final base = dot == -1 ? filename : filename.substring(0, dot);
+    final ext = dot == -1 ? '' : filename.substring(dot);
+    var i = 1;
+    while (await File('$dirPath/$base ($i)$ext').exists()) {
+      i++;
+    }
+    return '$base ($i)$ext';
+  }
+
+  Future<void> _addDownload(String url, {String? sha256}) async {
+    final destDir = await _getDownloadPath();
+    final rawName = url.split('/').last.split('?').first;
+    final desired = rawName.isEmpty ? 'download' : rawName;
+    final filename = await _resolveFilename(destDir, desired);
+    if (filename == null) return;
+
     final id = _idFromUrl(url);
-    final filename = url.split('/').last.split('?').first;
     final item = DownloadItem(
       id: id,
       url: url,
-      filename: filename.isEmpty ? 'download' : filename,
+      filename: filename,
       createdAt: DateTime.now().millisecondsSinceEpoch,
       status: 'queued',
       downloadedSize: 0,
+      sha256: sha256,
+      ownerUserId: _authService.currentUser?.id,
+      priority: _queue.length,
+      downloadPath: '$destDir/$filename',
     );
-    setState(() => _queue.add(item));
 
-    final destPath = await _getDownloadPath();
+    setState(() => _queue.add(item));
+    try {
+      await _db.insertDownload(item.toMap());
+    } catch (e) {
+      debugPrint('persist insert error: $e');
+    }
+
     try {
       await _method.invokeMethod('startDownload', {
         'id': id,
         'url': url,
-        'dest': '$destPath/${item.filename}',
+        'dest': '$destDir/$filename',
+        'sha256': sha256,
+        'bytesPerSecond': _settings.bandwidthBytesPerSecond,
       });
       setState(() {
         final idx = _queue.indexWhere((d) => d.id == id);
@@ -295,6 +389,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final idx = _queue.indexWhere((d) => d.id == id);
       if (idx != -1) _queue[idx].status = 'failed';
     });
+    _db.updateDownload(id, {'status': 'failed'}).catchError(
+      (e) => debugPrint('persist fail: $e'),
+    );
   }
 
   Future<void> _addBatchDownloads(List<String> urls) async {
@@ -307,17 +404,41 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await _method.invokeMethod('pauseDownload', {'id': item.id});
       setState(() => item.status = 'paused');
+      _db.updateDownload(item.id, {'status': 'paused'});
     } catch (e) {
       debugPrint('pause error: $e');
     }
   }
 
   Future<void> _resumeDownload(DownloadItem item) async {
+    // If the native handle has been lost (e.g. the process was killed
+    // and we just restored from DB), restart the download — the
+    // SegmentedDownloader's `.tg.json` sidecar makes this a true
+    // resume from the last persisted offset rather than a from-scratch
+    // re-download.
     try {
-      await _method.invokeMethod('resumeDownload', {'id': item.id});
+      final ok = await _method.invokeMethod<bool>('resumeDownload', {
+        'id': item.id,
+      });
+      if (ok == true) {
+        setState(() => item.status = 'downloading');
+        _db.updateDownload(item.id, {'status': 'downloading'});
+        return;
+      }
+    } catch (_) {}
+    final destDir = await _getDownloadPath();
+    try {
+      await _method.invokeMethod('startDownload', {
+        'id': item.id,
+        'url': item.url,
+        'dest': '$destDir/${item.filename}',
+        'sha256': item.sha256,
+        'bytesPerSecond': _settings.bandwidthBytesPerSecond,
+      });
       setState(() => item.status = 'downloading');
+      _db.updateDownload(item.id, {'status': 'downloading'});
     } catch (e) {
-      debugPrint('resume error: $e');
+      debugPrint('resume start error: $e');
     }
   }
 
@@ -325,6 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await _method.invokeMethod('cancelDownload', {'id': item.id});
       setState(() => item.status = 'cancelled');
+      _db.updateDownload(item.id, {'status': 'cancelled'});
     } catch (e) {
       debugPrint('cancel error: $e');
     }
@@ -337,6 +459,21 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => BatchImportScreen(onImport: _addBatchDownloads),
       ),
     );
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex--;
+      final item = _queue.removeAt(oldIndex);
+      _queue.insert(newIndex, item);
+      // Re-stamp priorities so the order survives an app restart.
+      for (var i = 0; i < _queue.length; i++) {
+        _queue[i].priority = i;
+        _db.updateDownload(_queue[i].id, {'priority': i}).catchError(
+          (e) => debugPrint('priority persist error: $e'),
+        );
+      }
+    });
   }
 
   @override
@@ -498,12 +635,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     )
-                  : ListView.builder(
+                  : ReorderableListView.builder(
                       itemCount: _queue.length,
+                      onReorder: _onReorder,
+                      buildDefaultDragHandles: false,
                       itemBuilder: (context, i) {
                         final item = _queue[i];
                         return Card(
+                          key: ValueKey(item.id),
                           child: ListTile(
+                            leading: ReorderableDragStartListener(
+                              index: i,
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Icon(Icons.drag_handle),
+                              ),
+                            ),
                             title: Text(item.filename,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis),

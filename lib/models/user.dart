@@ -25,6 +25,13 @@ class User {
   final DateTime createdAt;
   final String? createdBy;
 
+  /// SHA-256 hash of `recoverySalt + recoveryCode`, hex-encoded. Only
+  /// set on the super-admin and used by the forgot-password flow.
+  final String? recoveryHash;
+
+  /// Salt for [recoveryHash], hex-encoded.
+  final String? recoverySalt;
+
   const User({
     required this.id,
     this.username,
@@ -33,6 +40,8 @@ class User {
     required this.role,
     required this.createdAt,
     this.createdBy,
+    this.recoveryHash,
+    this.recoverySalt,
   });
 
   bool get isAdmin => role == UserRole.superAdmin;
@@ -51,6 +60,14 @@ class User {
     return sha256.convert(bytes).toString();
   }
 
+  /// Returns `true` if [code] matches this user's recovery hash.
+  bool verifyRecoveryCode(String code) {
+    final salt = recoverySalt;
+    final hash = recoveryHash;
+    if (salt == null || hash == null) return false;
+    return hashPassword(code.trim().toUpperCase(), salt) == hash;
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'username': username,
@@ -59,6 +76,8 @@ class User {
         'role': role.name,
         'createdAt': createdAt.toIso8601String(),
         'createdBy': createdBy,
+        'recoveryHash': recoveryHash,
+        'recoverySalt': recoverySalt,
       };
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -74,6 +93,8 @@ class User {
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
       createdBy: json['createdBy'] as String?,
+      recoveryHash: json['recoveryHash'] as String?,
+      recoverySalt: json['recoverySalt'] as String?,
     );
   }
 
@@ -82,6 +103,8 @@ class User {
     String? passwordHash,
     String? passwordSalt,
     UserRole? role,
+    String? recoveryHash,
+    String? recoverySalt,
   }) {
     return User(
       id: id,
@@ -91,6 +114,8 @@ class User {
       role: role ?? this.role,
       createdAt: createdAt,
       createdBy: createdBy,
+      recoveryHash: recoveryHash ?? this.recoveryHash,
+      recoverySalt: recoverySalt ?? this.recoverySalt,
     );
   }
 }

@@ -9,6 +9,9 @@ class SettingsManager {
   static const String _keySchedulerStartMinute = 'schedulerStartMinute';
   static const String _keySchedulerEndHour = 'schedulerEndHour';
   static const String _keySchedulerEndMinute = 'schedulerEndMinute';
+  static const String _keyBandwidthKbps = 'bandwidthKbps';
+  static const String _keyAccentColor = 'accentColorValue';
+  static const String _keyLocale = 'locale';
 
   static final SettingsManager _instance = SettingsManager._internal();
   factory SettingsManager() => _instance;
@@ -32,6 +35,34 @@ class SettingsManager {
       _prefs?.setString(_keyDownloadPath, value);
     } else {
       _prefs?.remove(_keyDownloadPath);
+    }
+  }
+
+  /// Bandwidth cap in kilobytes per second. `0` == unlimited.
+  int get bandwidthKbps => _prefs?.getInt(_keyBandwidthKbps) ?? 0;
+  set bandwidthKbps(int value) => _prefs?.setInt(_keyBandwidthKbps, value);
+
+  /// Bandwidth cap in bytes per second, derived from [bandwidthKbps].
+  int get bandwidthBytesPerSecond => bandwidthKbps * 1024;
+
+  /// Accent / seed color stored as a 32-bit ARGB integer. `null` falls
+  /// back to the default blue.
+  int? get accentColorValue => _prefs?.getInt(_keyAccentColor);
+  set accentColorValue(int? value) {
+    if (value != null) {
+      _prefs?.setInt(_keyAccentColor, value);
+    } else {
+      _prefs?.remove(_keyAccentColor);
+    }
+  }
+
+  /// Two-letter locale code (e.g. `en`, `yo`). `null` = follow system.
+  String? get localeCode => _prefs?.getString(_keyLocale);
+  set localeCode(String? value) {
+    if (value != null && value.isNotEmpty) {
+      _prefs?.setString(_keyLocale, value);
+    } else {
+      _prefs?.remove(_keyLocale);
     }
   }
 

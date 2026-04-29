@@ -61,6 +61,18 @@ class DownloadService {
     }
   }
 
+  /// Pushes a global bandwidth cap (in bytes/second; `0` for
+  /// unlimited) to every in-flight download on the native side.
+  Future<void> setBandwidthLimit(int bytesPerSecond) async {
+    try {
+      await _method.invokeMethod('setBandwidthLimit', {
+        'bytesPerSecond': bytesPerSecond,
+      });
+    } catch (e) {
+      debugPrint('Error setting bandwidth limit: $e');
+    }
+  }
+
   Future<void> resumeAllDownloads() async {
     if (_isWifiOnly) {
       final results = await _connectivity.checkConnectivity();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'admin_panel.dart';
+import 'password_recovery_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -112,7 +113,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     : const Text('Login'),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: _isLoading
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PasswordRecoveryScreen(),
+                        ),
+                      ),
+              child: const Text('Forgot password?'),
+            ),
+            const SizedBox(height: 4),
             TextButton.icon(
               onPressed: _isLoading ? null : _continueAsGuest,
               icon: const Icon(Icons.person_outline),
