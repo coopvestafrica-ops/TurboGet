@@ -4,6 +4,11 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:label="TurboGet"
@@ -25,14 +30,48 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Accept plain-text URLs shared from other apps (e.g. browser share sheet). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- Allow http(s) links to be opened directly in TurboGet. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
         </activity>
+
+        <!-- Foreground service that owns the download progress notification. -->
+        <service
+            android:name="com.example.downloader.DownloadForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
+        <!-- Receives Pause/Resume/Cancel taps from the progress notification. -->
+        <receiver
+            android:name="com.example.downloader.DownloadActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.downloader.action.pause" />
+                <action android:name="com.example.downloader.action.resume" />
+                <action android:name="com.example.downloader.action.cancel" />
+            </intent-filter>
+        </receiver>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-            
-        <!-- AdMob app ID -->
+
+        <!-- AdMob disabled until monetization is enabled. Flip the
+             `kAdsEnabled` constant in lib/main.dart and replace the value
+             below with your production AdMob app ID before shipping ads. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/> <!-- TODO: Replace with your actual AdMob app ID -->
+            android:value="ca-app-pub-0000000000000000~0000000000"/>
     </application>
 </manifest>

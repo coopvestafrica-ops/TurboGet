@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -56,7 +57,19 @@ class DownloadService {
     try {
       await _method.invokeMethod('pauseAllDownloads');
     } catch (e) {
-      print('Error pausing downloads: $e');
+      debugPrint('Error pausing downloads: $e');
+    }
+  }
+
+  /// Pushes a global bandwidth cap (in bytes/second; `0` for
+  /// unlimited) to every in-flight download on the native side.
+  Future<void> setBandwidthLimit(int bytesPerSecond) async {
+    try {
+      await _method.invokeMethod('setBandwidthLimit', {
+        'bytesPerSecond': bytesPerSecond,
+      });
+    } catch (e) {
+      debugPrint('Error setting bandwidth limit: $e');
     }
   }
 
@@ -72,7 +85,7 @@ class DownloadService {
     try {
       await _method.invokeMethod('resumeAllDownloads');
     } catch (e) {
-      print('Error resuming downloads: $e');
+      debugPrint('Error resuming downloads: $e');
     }
   }
 

@@ -14,6 +14,17 @@ class DownloadItem {
   List<DownloadSegment>? segments;
   String? error;
   Map<String, dynamic>? metadata;
+
+  /// Optional SHA-256 of the expected payload, used to verify integrity
+  /// when the download completes. Lower-case hex.
+  String? sha256;
+
+  /// Owning user's id. Super-admins can see every download; everyone
+  /// else sees only their own.
+  String? ownerUserId;
+
+  /// Sort order in the active queue. Lower numbers run first.
+  int priority;
   double _speed = 0;
   int _lastBytes = 0;
   DateTime? _lastUpdateTime;
@@ -24,7 +35,7 @@ class DownloadItem {
     if (_speed < 1024 * 1024) return '${(_speed / 1024).toStringAsFixed(1)} KB/s';
     return '${(_speed / (1024 * 1024)).toStringAsFixed(1)} MB/s';
   }
-  
+
   String get estimatedTimeRemaining {
     if (_speed == 0 || totalSize == null) return '--:--';
     final remainingBytes = totalSize! - downloadedSize;
@@ -63,6 +74,9 @@ class DownloadItem {
     this.segments,
     this.error,
     this.metadata,
+    this.sha256,
+    this.ownerUserId,
+    this.priority = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -76,9 +90,14 @@ class DownloadItem {
       'status': status,
       'progress': progress,
       'download_path': downloadPath,
-      'segments': segments != null ? jsonEncode(segments!.map((s) => s.toMap()).toList()) : null,
+      'segments': segments != null
+          ? jsonEncode(segments!.map((s) => s.toMap()).toList())
+          : null,
       'error': error,
       'metadata': metadata != null ? jsonEncode(metadata) : null,
+      'sha256': sha256,
+      'owner_user_id': ownerUserId,
+      'priority': priority,
     };
   }
 
@@ -94,10 +113,17 @@ class DownloadItem {
       progress: (map['progress'] as int?) ?? 0,
       downloadPath: map['download_path'] as String?,
       segments: map['segments'] != null
-          ? List<DownloadSegment>.from((jsonDecode(map['segments'] as String) as List).map((x) => DownloadSegment.fromMap(x as Map<String, dynamic>)))
+          ? List<DownloadSegment>.from(
+              (jsonDecode(map['segments'] as String) as List)
+                  .map((x) => DownloadSegment.fromMap(x as Map<String, dynamic>)))
           : null,
       error: map['error'] as String?,
-      metadata: map['metadata'] != null ? Map<String, dynamic>.from(jsonDecode(map['metadata'] as String)) : null,
+      metadata: map['metadata'] != null
+          ? Map<String, dynamic>.from(jsonDecode(map['metadata'] as String))
+          : null,
+      sha256: map['sha256'] as String?,
+      ownerUserId: map['owner_user_id'] as String?,
+      priority: (map['priority'] as int?) ?? 0,
     );
   }
 }

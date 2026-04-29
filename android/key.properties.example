@@ -1,0 +1,10 @@
+# TurboGet release-signing example. Copy to `android/key.properties`
+# (which is gitignored) and fill in real values to produce signed
+# release APKs. Without this file `flutter build apk --release` falls
+# back to the debug signing config.
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=turboget
+# Path is resolved relative to android/app/. We recommend an absolute
+# path so the same value works in CI.
+storeFile=/absolute/path/to/turboget-release.keystore

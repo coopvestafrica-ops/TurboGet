@@ -238,9 +238,12 @@ class TurboDownloader {
       final port = uri.port == 0 ? (uri.scheme == 'https' ? 443 : 80) : uri.port;
       
       // Connect with appropriate socket type
-      socket = await (uri.scheme == 'https' 
-          ? SecureSocket.connect(uri.host, port,
-              onBadCertificate: (cert) => true) // TODO: Proper cert validation
+      // Validate TLS certificates normally. A previous revision bypassed
+      // this entirely with `onBadCertificate: (_) => true`, which is a
+      // man-in-the-middle risk. If the host has a broken cert the download
+      // will fail — and that's the correct behaviour.
+      socket = await (uri.scheme == 'https'
+          ? SecureSocket.connect(uri.host, port)
           : Socket.connect(uri.host, port));
 
       final sockets = _activeSockets[id];
@@ -256,7 +259,10 @@ class TurboDownloader {
         throw Exception('Download file no longer exists: $filePath');
       }
       
-      raf = await file.open(mode: FileMode.write);
+      // IMPORTANT: use writeOnlyAppend (not write) — FileMode.write
+      // truncates the file, wiping out other segments' work. Append mode
+      // preserves existing bytes and lets us seek into our slice.
+      raf = await file.open(mode: FileMode.writeOnlyAppend);
       await raf.setPosition(segment.start);
 
       // Send HTTP request with range
@@ -585,8 +591,7 @@ class TurboDownloader {
     
     try {
       socket = await (uri.scheme == 'https'
-          ? SecureSocket.connect(uri.host, port, 
-              onBadCertificate: (cert) => true) // TODO: Proper cert validation
+          ? SecureSocket.connect(uri.host, port)
           : Socket.connect(uri.host, port));
 
       final request = StringBuffer()

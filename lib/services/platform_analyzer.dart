@@ -7,10 +7,15 @@ enum PlatformType {
   amazon,
   vimeo,
   dailymotion,
-  general
+  general,
 }
 
-class VideoQuality {
+/// A selectable video quality returned by [PlatformAnalyzer.getVideoQualities].
+///
+/// Named `PlatformVideoQuality` to avoid clashing with the unrelated
+/// `VideoQuality` in `models/quality_options.dart` which describes a
+/// different UI-facing concept.
+class PlatformVideoQuality {
   final String url;
   final String quality;
   final int? width;
@@ -19,7 +24,7 @@ class VideoQuality {
   final int? bitrate;
   final int? fileSize;
 
-  VideoQuality({
+  const PlatformVideoQuality({
     required this.url,
     required this.quality,
     this.width,
@@ -30,12 +35,21 @@ class VideoQuality {
   });
 }
 
+/// Detects the platform a URL belongs to and extracts video metadata /
+/// available qualities.
+///
+/// Owns a lazily-created [YoutubeExplode] client. The client is reused
+/// across calls; callers should invoke [dispose] when the analyzer is no
+/// longer needed. A previous revision closed the client after every call,
+/// making subsequent extractions fail.
 class PlatformAnalyzer {
-  final _yt = YoutubeExplode();
-  
+  YoutubeExplode? _yt;
+
+  YoutubeExplode get _client => _yt ??= YoutubeExplode();
+
   Future<PlatformType> detectPlatform(String url) async {
     final uri = Uri.parse(url);
-    
+
     if (uri.host.contains('youtube.com') || uri.host.contains('youtu.be')) {
       return PlatformType.youtube;
     } else if (uri.host.contains('amazon.com')) {
@@ -45,142 +59,158 @@ class PlatformAnalyzer {
     } else if (uri.host.contains('dailymotion.com')) {
       return PlatformType.dailymotion;
     }
-    
+
     return PlatformType.general;
   }
 
-  Future<List<VideoQuality>> getVideoQualities(String url) async {
+  Future<List<PlatformVideoQuality>> getVideoQualities(String url) async {
     final platform = await detectPlatform(url);
-    
+
     switch (platform) {
       case PlatformType.youtube:
-        return await _getYoutubeQualities(url);
+        return _getYoutubeQualities(url);
       case PlatformType.vimeo:
-        return await _getVimeoQualities(url);
+        return _getVimeoQualities(url);
       case PlatformType.dailymotion:
-        return await _getDailymotionQualities(url);
+        return _getDailymotionQualities(url);
       default:
         throw UnsupportedError('Platform not supported for quality extraction');
     }
   }
 
-  Future<List<VideoQuality>> _getYoutubeQualities(String url) async {
-    try {
-      final video = await _yt.videos.get(url);
-      final manifest = await _yt.videos.streamsClient.getManifest(video.id);
-      
-      final qualities = <VideoQuality>[];
-      
-      // Add video-only streams
-      for (var stream in manifest.videoOnly) {
-        qualities.add(VideoQuality(
-          url: stream.url.toString(),
-          quality: '${stream.videoQuality.name} (video only)',
-          width: stream.videoResolution.width,
-          height: stream.videoResolution.height,
-          format: stream.container.name,
-          bitrate: stream.bitrate.bitsPerSecond,
-          fileSize: stream.size.totalBytes,
-        ));
-      }
+  Future<List<PlatformVideoQuality>> _getYoutubeQualities(String url) async {
+    final video = await _client.videos.get(url);
+    final manifest = await _client.videos.streamsClient.getManifest(video.id);
 
-      // Add muxed streams (video+audio)
-      for (var stream in manifest.muxed) {
-        qualities.add(VideoQuality(
-          url: stream.url.toString(),
-          quality: '${stream.videoQuality.name} (with audio)',
-          width: stream.videoResolution.width,
-          height: stream.videoResolution.height,
-          format: stream.container.name,
-          bitrate: stream.bitrate.bitsPerSecond,
-          fileSize: stream.size.totalBytes,
-        ));
-      }
+    final qualities = <PlatformVideoQuality>[];
 
-      // Add audio-only streams
-      for (var stream in manifest.audioOnly) {
-        qualities.add(VideoQuality(
-          url: stream.url.toString(),
-          quality: 'Audio ${stream.bitrate.kiloBitsPerSecond}kbps',
-          format: stream.container.name,
-          bitrate: stream.bitrate.bitsPerSecond,
-          fileSize: stream.size.totalBytes,
-        ));
-      }
-
-      return qualities;
-    } finally {
-      _yt.close();
+    for (final stream in manifest.videoOnly) {
+      qualities.add(PlatformVideoQuality(
+        url: stream.url.toString(),
+        quality: '${stream.videoQuality.name} (video only)',
+        width: stream.videoResolution.width,
+        height: stream.videoResolution.height,
+        format: stream.container.name,
+        bitrate: stream.bitrate.bitsPerSecond,
+        fileSize: stream.size.totalBytes,
+      ));
     }
+
+    for (final stream in manifest.muxed) {
+      qualities.add(PlatformVideoQuality(
+        url: stream.url.toString(),
+        quality: '${stream.videoQuality.name} (with audio)',
+        width: stream.videoResolution.width,
+        height: stream.videoResolution.height,
+        format: stream.container.name,
+        bitrate: stream.bitrate.bitsPerSecond,
+        fileSize: stream.size.totalBytes,
+      ));
+    }
+
+    for (final stream in manifest.audioOnly) {
+      qualities.add(PlatformVideoQuality(
+        url: stream.url.toString(),
+        quality: 'Audio ${stream.bitrate.kiloBitsPerSecond}kbps',
+        format: stream.container.name,
+        bitrate: stream.bitrate.bitsPerSecond,
+        fileSize: stream.size.totalBytes,
+      ));
+    }
+
+    return qualities;
   }
 
-  Future<List<VideoQuality>> _getVimeoQualities(String url) async {
-    // Implementation for Vimeo quality extraction
-    // Would require Vimeo API credentials in production
+  Future<List<PlatformVideoQuality>> _getVimeoQualities(String url) async {
     throw UnimplementedError('Vimeo support coming soon');
   }
 
-  Future<List<VideoQuality>> _getDailymotionQualities(String url) async {
-    // Implementation for Dailymotion quality extraction
+  Future<List<PlatformVideoQuality>> _getDailymotionQualities(
+      String url) async {
     throw UnimplementedError('Dailymotion support coming soon');
   }
 
   Future<Map<String, dynamic>> getVideoMetadata(String url) async {
     final platform = await detectPlatform(url);
-    
+
     switch (platform) {
       case PlatformType.youtube:
-        return await _getYoutubeMetadata(url);
+        return _getYoutubeMetadata(url);
       case PlatformType.vimeo:
-        return await _getVimeoMetadata(url);
+        return _getVimeoMetadata(url);
       case PlatformType.dailymotion:
-        return await _getDailymotionMetadata(url);
+        return _getDailymotionMetadata(url);
       default:
-        return await _getGeneralMetadata(url);
+        return _getGeneralMetadata(url);
     }
   }
 
   Future<Map<String, dynamic>> _getYoutubeMetadata(String url) async {
-    try {
-      final video = await _yt.videos.get(url);
-      return {
-        'title': video.title,
-        'author': video.author,
-        'duration': video.duration?.inSeconds ?? 0,
-        'thumbnailUrl': video.thumbnails.highResUrl,
-        'description': video.description,
-        'platform': 'YouTube',
-      };
-    } finally {
-      _yt.close();
-    }
+    final video = await _client.videos.get(url);
+    return {
+      'title': video.title,
+      'author': video.author,
+      'duration': video.duration?.inSeconds ?? 0,
+      'thumbnailUrl': video.thumbnails.highResUrl,
+      'thumbnails': {
+        'low': video.thumbnails.lowResUrl,
+        'medium': video.thumbnails.mediumResUrl,
+        'high': video.thumbnails.highResUrl,
+        'standard': video.thumbnails.standardResUrl,
+        'max': video.thumbnails.maxResUrl,
+      },
+      'description': video.description,
+      'platform': 'YouTube',
+    };
+  }
+
+  /// Returns the available closed-caption tracks for a YouTube URL,
+  /// each entry providing `language`, `code`, and a downloadable
+  /// `url` for the SRV3/VTT track.
+  Future<List<Map<String, String>>> getYoutubeSubtitles(String url) async {
+    final video = await _client.videos.get(url);
+    final manifest =
+        await _client.videos.closedCaptions.getManifest(video.id);
+    return manifest.tracks
+        .map((t) => {
+              'language': t.language.name,
+              'code': t.language.code,
+              'url': t.url.toString(),
+              'auto': t.isAutoGenerated.toString(),
+            })
+        .toList();
   }
 
   Future<Map<String, dynamic>> _getVimeoMetadata(String url) async {
-    // Implement Vimeo metadata extraction
     throw UnimplementedError('Vimeo support coming soon');
   }
 
   Future<Map<String, dynamic>> _getDailymotionMetadata(String url) async {
-    // Implement Dailymotion metadata extraction
     throw UnimplementedError('Dailymotion support coming soon');
   }
 
   Future<Map<String, dynamic>> _getGeneralMetadata(String url) async {
     try {
       final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        return {'title': url.split('/').last, 'platform': 'General'};
+      }
       final document = parser.parse(response.body);
-      
+      final title =
+          document.querySelector('title')?.text.trim() ?? url.split('/').last;
       return {
-        'title': document.querySelector('title')?.text ?? 'Unknown Title',
+        'title': title,
         'platform': 'General',
       };
-    } catch (e) {
-      return {
-        'title': 'Unknown Title',
-        'platform': 'General',
-      };
+    } catch (_) {
+      return {'title': url.split('/').last, 'platform': 'General'};
     }
   }
 
+  /// Releases the YoutubeExplode client. Call from the owning widget's
+  /// dispose method; further calls will recreate the client on demand.
+  void dispose() {
+    _yt?.close();
+    _yt = null;
+  }
 }

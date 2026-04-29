@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/platform_analyzer.dart';
 
 class QualitySelectionDialog extends StatelessWidget {
-  final List<VideoQuality> qualities;
+  final List<PlatformVideoQuality> qualities;
   final String title;
   final String? thumbnail;
 
@@ -83,7 +83,7 @@ class QualitySelectionDialog extends StatelessWidget {
     );
   }
 
-  IconData _getIconForQuality(VideoQuality quality) {
+  IconData _getIconForQuality(PlatformVideoQuality quality) {
     if (quality.quality.toLowerCase().contains('audio')) {
       return Icons.audiotrack;
     }
@@ -107,13 +107,13 @@ class QualitySelectionDialog extends StatelessWidget {
   }
 }
 
-Future<VideoQuality?> showQualitySelectionDialog(
+Future<PlatformVideoQuality?> showQualitySelectionDialog(
   BuildContext context,
-  List<VideoQuality> qualities,
+  List<PlatformVideoQuality> qualities,
   String title,
   String? thumbnail,
 ) {
-  return showDialog<VideoQuality>(
+  return showDialog<PlatformVideoQuality>(
     context: context,
     builder: (context) => QualitySelectionDialog(
       qualities: qualities,
