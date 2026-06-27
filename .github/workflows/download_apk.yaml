@@ -1,0 +1,129 @@
+name: Build & Download APK
+
+on:
+  # Run on every push to main
+  push:
+    branches: [main]
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - debug
+          - release
+
+env:
+  FLUTTER_VERSION: '3.24.0'
+  DART_VERSION: '3.5.0'
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          dart-version: ${{ env.DART_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Cache Flutter packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run Flutter analyze
+        run: flutter analyze || true
+
+      - name: Build Debug APK
+        if: inputs.build_type == 'debug' || github.event.inputs.build_type == 'debug' || github.event_name == 'push'
+        run: |
+          flutter build apk --debug
+          ls -la build/app/outputs/flutter-apk/
+
+      - name: Build Release APK
+        if: inputs.build_type == 'release' || github.event.inputs.build_type == 'release'
+        run: |
+          flutter build apk --release --split-per-abi
+          ls -la build/app/outputs/flutter-apk/
+
+      - name: Upload Debug APK
+        if: inputs.build_type == 'debug' || github.event.inputs.build_type == 'debug' || github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: turboget-debug-apk
+          path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
+
+      - name: Upload Release APK
+        if: inputs.build_type == 'release' || github.event.inputs.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: turboget-release-apk
+          path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 90
+
+      - name: Create GitHub Release
+        if: inputs.build_type == 'release' || github.event.inputs.build_type == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          files: build/app/outputs/flutter-apk/*.apk
+          tag_name: v${{ github.run_number }}
+          name: TurboGet v${{ github.run_number }}
+          body: |
+            ## 🚀 TurboGet - The Best Download Manager
+            
+            **Built automatically from main branch**
+            
+            ### Features:
+            - Beautiful Dashboard UI
+            - Persistent Resume Support
+            - Turbo Speed (16 parallel segments)
+            - YouTube Downloads
+            - QR Scanner
+            - And more!
+            
+            ---
+            **Developer:** Ayanlowo Olatunji Ayobami
+            **Email:** ayanlowo89@gmail.com
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  download:
+    name: Download APK
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download Debug APK
+        uses: actions/download-artifact@v4
+        with:
+          name: turboget-debug-apk
+          path: ./apk
+
+      - name: List downloaded files
+        run: |
+          echo "Downloaded APKs:"
+          ls -lh ./apk/
