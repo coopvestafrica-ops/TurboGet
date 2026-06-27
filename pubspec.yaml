@@ -58,6 +58,16 @@ dependencies:
   package_info_plus: ^10.0.2
   http: ^1.2.2
   
+  # YouTube Downloads
+  youtube_explode_dart: ^2.3.2
+  
+  # QR Scanner
+  mobile_scanner: ^6.0.2
+  
+  # Cloud Services
+  google_sign_in: ^6.2.2
+  drive_client: ^0.0.1
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
