@@ -48,12 +48,24 @@ class User {
       createdBy: json['createdBy'],
     );
   }
+}
 
-  static User get superAdmin => User(
-    id: 'super_admin',
-    username: 'Teejayfpi',
-    password: 'Temiloluwa@1963',
-    role: UserRole.superAdmin,
-    createdAt: DateTime(2025),
+/// Configuration for the super admin account.
+/// In production, these should be set via environment variables or secure configuration.
+/// Default credentials are for development only and should be changed in production.
+class AdminConfig {
+  static const String defaultAdminUsername = 'admin';
+  static const String defaultAdminPassword = 'changeme'; // Must be changed in production!
+  
+  static String get adminUsername => const String.fromEnvironment(
+    'ADMIN_USERNAME',
+    defaultValue: defaultAdminUsername,
   );
+  
+  static String get adminPassword => const String.fromEnvironment(
+    'ADMIN_PASSWORD',
+    defaultValue: defaultAdminPassword,
+  );
+  
+  static bool get isProduction => const bool.fromEnvironment('PRODUCTION', defaultValue: false);
 }

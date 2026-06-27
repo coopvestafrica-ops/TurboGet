@@ -18,10 +18,8 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VSCode
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -29,6 +27,7 @@ migrate_working_dir/
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
 /build/
@@ -39,7 +38,90 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio/Gradle
 /android/app/debug
 /android/app/profile
 /android/app/release
+**/android/.gradle/
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/.idea/
+**/android/app/*.jks
+**/android/app/*.key
+**/android/app/*.keystore
+
+# iOS/Xcode
+**/ios/*.xcworkspace
+**/ios/*.xcuserstate
+**/ios/Pods/
+**/ios/Podfile.lock
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+
+# macOS
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Windows
+**/windows/**/*.obj
+**/windows/**/*.exp
+**/windows/**/*.ilk
+**/windows/**/*.lib
+**/windows/**/*.pdb
+
+# Linux
+**/linux/.cmake/
+**/linux/build/
+**/linux/flutter/*.dart_tool/
+
+# Web (exclude generated, keep template)
+**/web/manifest.json
+**/web/index.html
+**/web/favicon.png
+!web/manifest.json
+!web/index.html
+
+# Coverage
+coverage/
+lcov.info
+*.lcov
+*.html
+
+# Build outputs
+build/
+*.hprof
+*.jks
+*.keystore
+
+# Environment/Secrets (NEVER commit these)
+.env
+.env.*
+*.env
+secrets.json
+credentials.json
+**/secrets/
+**/credentials/
+
+# Generated files
+*.mocks.dart
+*.g.dart
+*.freezed.dart
+
+# Test coverage
+test/.test_coverage.dart
+test/coverage/
+
+# FVM (Flutter Version Management)
+.fvm/
+
+# Assets placeholder (uncomment after adding real assets)
+# assets/images/
+# assets/icons/

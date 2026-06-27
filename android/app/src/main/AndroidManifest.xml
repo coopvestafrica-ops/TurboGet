@@ -1,14 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Network permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    
+    <!-- Storage permissions -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    
+    <!-- Notification permissions -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    
+    <!-- Overlay permission -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
+    
+    <!-- Foreground service permission -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    
+    <!-- Wake lock for downloads -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Boot receiver to resume downloads -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    
     <application
         android:label="TurboGet"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true"
+        android:usesCleartextTraffic="true">
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,7 +53,44 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            
+            <!-- Deep linking -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="turboget" />
+            </intent-filter>
+            
+            <!-- Share intent filter -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
+        
+        <!-- Download Broadcast Receiver -->
+        <receiver 
+            android:name=".download.DownloadBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.turboget.action.PAUSE_DOWNLOAD" />
+                <action android:name="com.example.turboget.action.RESUME_DOWNLOAD" />
+                <action android:name="com.example.turboget.action.CANCEL_DOWNLOAD" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- Boot receiver -->
+        <receiver 
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -33,6 +98,6 @@
         <!-- AdMob app ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/> <!-- TODO: Replace with your actual AdMob app ID -->
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
     </application>
 </manifest>

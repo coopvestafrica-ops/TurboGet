@@ -1,0 +1,148 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  FLUTTER_VERSION: '3.24.0'
+
+jobs:
+  release-android:
+    name: Release Android
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Update version
+        run: |
+          flutter pub run build_runner build --delete-conflicting-outputs || true
+          sed -i 's/version: .*/version: ${{ inputs.version }}+1/' pubspec.yaml
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Build App Bundle
+        run: flutter build appbundle --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-${{ inputs.version }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Upload App Bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-${{ inputs.version }}
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: inputs.environment == 'production'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ inputs.version }}
+          release_name: TurboGet v${{ inputs.version }}
+          draft: true
+          prerelease: false
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-ios:
+    name: Release iOS
+    runs-on: macos-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.0'
+
+      - name: Update version
+        run: |
+          flutter pub run build_runner build --delete-conflicting-outputs || true
+          sed -i 's/version: .*/version: ${{ inputs.version }}+1/' pubspec.yaml
+
+      - name: Build iOS for simulator
+        run: flutter build ios --simulator --no-codesign
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-${{ inputs.version }}
+          path: build/ios/
+          retention-days: 30
+
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [release-android, release-ios]
+    steps:
+      - name: Create Slack Notification
+        uses: slackapi/slack-github-action@v1
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          payload: |
+            {
+              "text": ":rocket: TurboGet ${{ inputs.version }} has been released!",
+              "attachments": [{
+                "color": "#36a64f",
+                "fields": [
+                  { "title": "Version", "value": "${{ inputs.version }}", "short": true },
+                  { "title": "Environment", "value": "${{ inputs.environment }}", "short": true }
+                ]
+              }]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

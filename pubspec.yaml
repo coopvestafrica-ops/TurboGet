@@ -1,6 +1,7 @@
 name: turboget
-description: "TurboGet - A fast download manager with advanced features"
+description: "TurboGet - Enterprise-grade download manager with advanced features, user management, and analytics."
 publish_to: 'none'
+repository: https://github.com/your-org/turboget
 
 version: 1.0.0+1
 
@@ -11,6 +12,12 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+  
+  # Core
   path_provider: ^2.1.0
   sqflite: ^2.3.0
   path: ^1.9.0
@@ -18,24 +25,49 @@ dependencies:
   permission_handler: ^11.0.0
   shared_preferences: ^2.2.0
   http: ^1.2.0
+  
+  # Media & Content
   system_alert_window: ^2.0.7
   video_player: ^2.8.0
   chewie: ^1.8.0
   mime: ^1.0.4
   youtube_explode_dart: ^2.0.2
   html: ^0.15.4
+  
+  # App Info & Sharing
   package_info_plus: ^8.0.0
   url_launcher: ^6.3.0
+  share_plus: ^7.2.0
+  
+  # Ads & Monetization
   google_mobile_ads: ^6.0.0
   
-  # New features
+  # Download Management
   flutter_downloader: ^1.11.0
-  share_plus: ^7.2.0
+  
+  # Utilities
+  intl: ^0.19.0
+  uuid: ^4.5.1
+  equatable: ^2.0.7
+  mime: ^2.0.0
+  path: ^1.9.0
+  percent_indicator: ^4.2.3
+  shimmer: ^3.0.0
+  flutter_local_notifications: ^18.0.1
+  permission_handler: ^11.3.1
+  package_info_plus: ^10.0.2
+  http: ^1.2.2
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  riverpod_generator: ^2.6.3
+  build_runner: ^2.4.13
+  mocktail: ^1.0.4
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
