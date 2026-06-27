@@ -1,450 +1,138 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'services/ad_manager.dart';
 import 'services/auth_service.dart';
-import 'services/media_detector_service.dart';
 import 'services/theme_service.dart';
-import 'services/download_scheduler.dart';
-import 'models/download_item.dart';
-import 'screens/login_screen.dart';
-import 'screens/admin_panel.dart';
+import 'services/logger_service.dart';
+import 'services/exception_handler.dart';
 import 'screens/settings_screen.dart';
-import 'screens/download_history_screen.dart';
-import 'screens/file_browser_screen.dart';
-import 'screens/batch_import_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'providers/providers.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Future.wait([
-    AdManager().initialize(),
-    AuthService.instance.initialize(),
-    ThemeService.instance.initialize(),
-    DownloadScheduler.instance.initialize(),
-  ]);
-  runApp(const MyApp());
+/// Application version info
+class AppInfo {
+  static const String name = 'TurboGet';
+  static const String version = '1.0.0';
+  static const String buildNumber = '1';
+  static const String environment = String.fromEnvironment('ENVIRONMENT', defaultValue: 'development');
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+Future<void> main() async {
+  // Ensure Flutter binding is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize exception handler first
+  exceptionHandler.initialize();
+  
+  // Initialize logger
+  final appDocDir = await getApplicationDocumentsDirectory();
+  await logger.initialize(
+    minLevel: AppInfo.environment == 'production' ? LogLevel.info : LogLevel.debug,
+    enableFileOutput: AppInfo.environment == 'production',
+    logDirectory: '${appDocDir.path}/logs',
+  );
+  
+  logger.info('AppStartup', 'Starting ${AppInfo.name} v${AppInfo.version} (${AppInfo.environment})');
+  
+  // Run error handling wrapper
+  await exceptionHandler.runGuarded<void>(
+    'AppStartup',
+    () async {
+      // Initialize core services in parallel
+      await Future.wait([
+        AdManager().initialize(),
+        AuthService.instance.initialize(),
+        ThemeService.instance.initialize(),
+        DownloadScheduler.instance.initialize(),
+      ]);
+      
+      logger.info('AppStartup', 'All services initialized successfully');
+    },
+    context: 'service initialization',
+  );
+  
+  // Run the app with Riverpod
+  runApp(
+    ProviderScope(
+      child: const TurboGetApp(),
+    ),
+  );
+}
+
+class TurboGetApp extends ConsumerWidget {
+  const TurboGetApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    
     return MaterialApp(
-      title: 'TurboGet',
+      title: AppInfo.name,
       debugShowCheckedModeBanner: false,
       theme: ThemeService.instance.lightTheme,
       darkTheme: ThemeService.instance.darkTheme,
-      themeMode: ThemeService.instance.themeMode,
-      home: const HomeScreen(),
+      themeMode: themeState.themeMode,
+      home: const DashboardScreen(),
+      // Global error handling for Material widgets
+      builder: (context, child) {
+        return ErrorWidget.builder = (FlutterErrorDetails details) {
+          logger.error(
+            'UI',
+            'Widget error: ${details.exceptionAsString()}',
+            error: details.exception,
+            stackTrace: details.stack,
+          );
+          return _ErrorScreen(error: details.exceptionAsString());
+        };
+      },
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  static const MethodChannel _method = MethodChannel('com.example.downloader/methods');
-  static const EventChannel _events = EventChannel('com.example.downloader/events');
-
-  final List<DownloadItem> _queue = [];
-  StreamSubscription<dynamic>? _eventSub;
-  final TextEditingController _urlController = TextEditingController();
+/// Custom error screen for uncaught errors
+class _ErrorScreen extends StatelessWidget {
+  final String error;
   
-  final _authService = AuthService.instance;
-  final _adManager = AdManager();
-  final _scheduler = DownloadScheduler.instance;
+  const _ErrorScreen({required this.error});
   
-  BannerAd? _bannerAd;
-  int _downloadCount = 0;
-
-  bool get _shouldShowAds => _authService.currentUser?.shouldShowAds ?? true;
-
-  final _mediaDetector = MediaDetectorService();
-
-  @override
-  void initState() {
-    super.initState();
-    _startListening();
-    _initAds();
-    _initMediaDetection();
-    _initScheduler();
-  }
-
-  void _initAds() {
-    if (_shouldShowAds) {
-      _bannerAd = _adManager.createBannerAd()..load();
-      _adManager.loadInterstitialAd();
-    }
-  }
-
-  void _showInterstitialAd() {
-    if (!_shouldShowAds) return;
-    _downloadCount++;
-    if (_downloadCount % 3 == 0) {
-      _adManager.showInterstitialAd();
-    }
-  }
-
-  void _startListening() {
-    _eventSub = _events.receiveBroadcastStream().listen((dynamic event) {
-      if (event is Map) {
-        final id = event['id'] ?? event['url'];
-        final rawProgress = event['progress'] ?? 0;
-        int progress = 0;
-        if (rawProgress is num) {
-          progress = rawProgress.toInt();
-        } else if (rawProgress is String) {
-          progress = int.tryParse(rawProgress) ?? 0;
-        }
-        final status = (event['status'] ?? 'downloading').toString();
-        setState(() {
-          final idx = _queue.indexWhere((d) => d.id == id);
-          if (idx != -1) {
-            final item = _queue[idx];
-            item.progress = progress;
-            item.status = status;
-            
-            if (event['bytes'] != null) {
-              final bytes = event['bytes'] as int;
-              item.downloadedSize = bytes;
-              item.updateSpeed(bytes);
-            }
-            
-            if (event['total_size'] != null) {
-              item.totalSize = event['total_size'] as int;
-            }
-            
-            if (status == 'complete') {
-              _queue.removeAt(idx);
-              _showInterstitialAd();
-            }
-          }
-        });
-      }
-    }, onError: (e) {
-      print('Event channel error: $e');
-    });
-  }
-
-  Timer? _clipboardCheckTimer;
-
-  Future<void> _initMediaDetection() async {
-    await _mediaDetector.initialize();
-    _clipboardCheckTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      if (data?.text != null) {
-        await _mediaDetector.detectAndShowMedia(data!.text!);
-      }
-    });
-  }
-
-  void _initScheduler() {
-    _scheduler.onSchedulerStatusChanged = (status) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Scheduler: $status')),
-        );
-      }
-    };
-  }
-
-  @override
-  void dispose() {
-    _eventSub?.cancel();
-    _urlController.dispose();
-    _mediaDetector.dispose();
-    _clipboardCheckTimer?.cancel();
-    _scheduler.pauseAllScheduled();
-    super.dispose();
-  }
-
-  Future<String> _getDownloadPath() async {
-    final dir = await getExternalStorageDirectory();
-    final path = dir?.path ?? (await getApplicationDocumentsDirectory()).path;
-    return path;
-  }
-
-  String _idFromUrl(String url) => url.hashCode.toString();
-
-  Future<void> _addDownload(String url) async {
-    final id = _idFromUrl(url);
-    final filename = url.split('/').last.split('?').first;
-    final item = DownloadItem(
-      id: id,
-      url: url,
-      filename: filename,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      status: 'queued',
-      downloadedSize: 0,
-    );
-    setState(() => _queue.add(item));
-
-    final destPath = await _getDownloadPath();
-    try {
-      await _method.invokeMethod('startDownload', {
-        'id': id,
-        'url': url,
-        'dest': '$destPath/$filename',
-      });
-      setState(() {
-        final idx = _queue.indexWhere((d) => d.id == id);
-        if (idx != -1) _queue[idx].status = 'downloading';
-      });
-      _showInterstitialAd();
-    } on PlatformException catch (e) {
-      print('startDownload failed: ${e.message}');
-      setState(() {
-        final idx = _queue.indexWhere((d) => d.id == id);
-        if (idx != -1) _queue[idx].status = 'failed';
-      });
-    }
-  }
-
-  Future<void> _addBatchDownloads(List<String> urls) async {
-    for (final url in urls) {
-      await _addDownload(url);
-    }
-  }
-
-  Future<void> _pauseDownload(DownloadItem item) async {
-    try {
-      await _method.invokeMethod('pauseDownload', {'id': item.id});
-      setState(() => item.status = 'paused');
-    } catch (e) {
-      print('pause error: $e');
-    }
-  }
-
-  Future<void> _resumeDownload(DownloadItem item) async {
-    try {
-      await _method.invokeMethod('resumeDownload', {'id': item.id});
-      setState(() => item.status = 'downloading');
-    } catch (e) {
-      print('resume error: $e');
-    }
-  }
-
-  Future<void> _cancelDownload(DownloadItem item) async {
-    try {
-      await _method.invokeMethod('cancelDownload', {'id': item.id});
-      setState(() => item.status = 'cancelled');
-    } catch (e) {
-      print('cancel error: $e');
-    }
-  }
-
-  void _showBatchImport() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BatchImportScreen(onImport: _addBatchDownloads),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TurboGet'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Download History',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DownloadHistoryScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.folder_open),
-            tooltip: 'File Browser',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FileBrowserScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: Icon(_authService.isLoggedIn ? Icons.person : Icons.login),
-            onPressed: () async {
-              if (_authService.isAdmin) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AdminPanel()),
-                );
-              } else {
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-                if (result == true) {
-                  setState(() => _initAds());
-                }
-              }
-            },
-          ),
-        ],
+        title: const Text('Something went wrong'),
+        backgroundColor: Colors.red,
+        foregroundColor: Colors.white,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_shouldShowAds && _bannerAd != null)
-              SizedBox(
-                width: _bannerAd!.size.width.toDouble(),
-                height: _bannerAd!.size.height.toDouble(),
-                child: AdWidget(ad: _bannerAd!),
-              ),
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _urlController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter file URL',
-                    prefixIcon: Icon(Icons.link),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              PopupMenuButton(
-                icon: const Icon(Icons.add_circle),
-                tooltip: 'More options',
-                onSelected: (value) {
-                  if (value == 'batch') {
-                    _showBatchImport();
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  const PopupMenuItem(
-                    value: 'batch',
-                    child: ListTile(
-                      leading: Icon(Icons.playlist_add),
-                      title: Text('Batch Import'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-              ),
-            ]),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  final url = _urlController.text.trim();
-                  if (url.isNotEmpty) _addDownload(url);
-                },
-                icon: const Icon(Icons.download),
-                label: const Text('Download'),
-              ),
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text(
+              'Oops! Something went wrong.',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
-            // Scheduler status
-            if (_scheduler.queuedCount > 0)
-              Card(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.schedule),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Scheduled: ${_scheduler.queuedCount} downloads in queue',
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             const SizedBox(height: 8),
-            Expanded(
-              child: _queue.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.cloud_download,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No active downloads',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Enter a URL or use batch import',
-                            style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _queue.length,
-                      itemBuilder: (context, i) {
-                        final item = _queue[i];
-                        return Card(
-                          child: ListTile(
-                            title: Text(item.filename, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(item.url, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
-                              const SizedBox(height: 6),
-                              LinearProgressIndicator(value: (item.progress / 100.0).clamp(0.0, 1.0)),
-                              const SizedBox(height: 6),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('${item.progress}% • ${item.status}'),
-                                  if (item.status == 'downloading')
-                                    Text(
-                                      '${item.formattedSpeed} • ${item.estimatedTimeRemaining}',
-                                      style: Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                ],
-                              ),
-                            ]),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (v) async {
-                                if (v == 'pause') await _pauseDownload(item);
-                                if (v == 'resume') await _resumeDownload(item);
-                                if (v == 'cancel') await _cancelDownload(item);
-                              },
-                              itemBuilder: (ctx) => const [
-                                PopupMenuItem(value: 'pause', child: Text('Pause')),
-                                PopupMenuItem(value: 'resume', child: Text('Resume')),
-                                PopupMenuItem(value: 'cancel', child: Text('Cancel')),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+            Text(
+              'We\'re sorry for the inconvenience. Please try again or restart the app.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                logger.info('ErrorScreen', 'User tapped restart');
+                SystemNavigator.pop();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Restart App'),
             ),
           ],
         ),

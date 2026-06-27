@@ -1,0 +1,191 @@
+{
+  "@@locale": "en",
+  "appName": "TurboGet",
+  "@appName": {
+    "description": "The application name"
+  },
+  "appDescription": "Enterprise Download Manager",
+  "@appDescription": {
+    "description": "The application description"
+  },
+  "download": "Download",
+  "@download": {
+    "description": "Download action"
+  },
+  "downloading": "Downloading",
+  "@downloading": {
+    "description": "Downloading status"
+  },
+  "pause": "Pause",
+  "@pause": {
+    "description": "Pause action"
+  },
+  "resume": "Resume",
+  "@resume": {
+    "description": "Resume action"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel action"
+  },
+  "retry": "Retry",
+  "@retry": {
+    "description": "Retry action"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete action"
+  },
+  "settings": "Settings",
+  "@settings": {
+    "description": "Settings screen title"
+  },
+  "login": "Sign In",
+  "@login": {
+    "description": "Login action"
+  },
+  "logout": "Sign Out",
+  "@logout": {
+    "description": "Logout action"
+  },
+  "username": "Username",
+  "@username": {
+    "description": "Username field label"
+  },
+  "password": "Password",
+  "@password": {
+    "description": "Password field label"
+  },
+  "invalidCredentials": "Invalid credentials",
+  "@invalidCredentials": {
+    "description": "Error message for invalid login"
+  },
+  "noActiveDownloads": "No active downloads",
+  "@noActiveDownloads": {
+    "description": "Empty state message"
+  },
+  "downloadComplete": "Download complete",
+  "@downloadComplete": {
+    "description": "Success message for completed download"
+  },
+  "downloadFailed": "Download failed",
+  "@downloadFailed": {
+    "description": "Error message for failed download"
+  },
+  "networkError": "Network error",
+  "@networkError": {
+    "description": "Network error message"
+  },
+  "storageError": "Storage error",
+  "@storageError": {
+    "description": "Storage error message"
+  },
+  "permissionDenied": "Permission denied",
+  "@permissionDenied": {
+    "description": "Permission error message"
+  },
+  "wifiOnly": "Download on Wi-Fi only",
+  "@wifiOnly": {
+    "description": "Wi-Fi only setting label"
+  },
+  "maxConcurrent": "Maximum concurrent downloads",
+  "@maxConcurrent": {
+    "description": "Max concurrent downloads setting label"
+  },
+  "scheduler": "Scheduler",
+  "@scheduler": {
+    "description": "Scheduler setting label"
+  },
+  "theme": "Theme",
+  "@theme": {
+    "description": "Theme setting label"
+  },
+  "light": "Light",
+  "@light": {
+    "description": "Light theme option"
+  },
+  "dark": "Dark",
+  "@dark": {
+    "description": "Dark theme option"
+  },
+  "system": "System",
+  "@system": {
+    "description": "System theme option"
+  },
+  "clearCache": "Clear Cache",
+  "@clearCache": {
+    "description": "Clear cache action"
+  },
+  "about": "About",
+  "@about": {
+    "description": "About section title"
+  },
+  "version": "Version",
+  "@version": {
+    "description": "Version label"
+  },
+  "batchImport": "Batch Import",
+  "@batchImport": {
+    "description": "Batch import screen title"
+  },
+  "enterUrls": "Enter URLs",
+  "@enterUrls": {
+    "description": "Enter URLs hint text"
+  },
+  "downloadHistory": "Download History",
+  "@downloadHistory": {
+    "description": "Download history screen title"
+  },
+  "fileBrowser": "File Browser",
+  "@fileBrowser": {
+    "description": "File browser screen title"
+  },
+  "adminPanel": "Admin Panel",
+  "@adminPanel": {
+    "description": "Admin panel screen title"
+  },
+  "createUser": "Create User",
+  "@createUser": {
+    "description": "Create user action"
+  },
+  "deleteUser": "Delete User",
+  "@deleteUser": {
+    "description": "Delete user action"
+  },
+  "users": "Users",
+  "@users": {
+    "description": "Users section title"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save action"
+  },
+  "confirm": "Confirm",
+  "@confirm": {
+    "description": "Confirm action"
+  },
+  "error": "Error",
+  "@error": {
+    "description": "Error title"
+  },
+  "success": "Success",
+  "@success": {
+    "description": "Success title"
+  },
+  "loading": "Loading...",
+  "@loading": {
+    "description": "Loading indicator text"
+  },
+  "noInternet": "No internet connection",
+  "@noInternet": {
+    "description": "No internet error message"
+  },
+  "fileTooLarge": "File is too large",
+  "@fileTooLarge": {
+    "description": "File too large error"
+  },
+  "invalidUrl": "Invalid URL",
+  "@invalidUrl": {
+    "description": "Invalid URL error"
+  }
+}
