@@ -1,7 +1,7 @@
 name: turboget
 description: "TurboGet - Enterprise-grade download manager with advanced features, user management, and analytics."
 publish_to: 'none'
-repository: https://github.com/your-org/turboget
+repository: https://github.com/coopvestafrica-ops/TurboGet
 
 version: 1.0.0+1
 
@@ -22,16 +22,16 @@ dependencies:
   sqflite: ^2.3.0
   path: ^1.9.0
   connectivity_plus: ^6.0.0
-  permission_handler: ^11.0.0
+  permission_handler: ^11.3.1
   shared_preferences: ^2.2.0
-  http: ^1.2.0
+  http: ^1.2.2
   
   # Media & Content
   system_alert_window: ^2.0.7
   video_player: ^2.8.0
   chewie: ^1.8.0
   mime: ^1.0.4
-  youtube_explode_dart: ^2.0.2
+  youtube_explode_dart: ^2.3.2
   html: ^0.15.4
   
   # App Info & Sharing
@@ -49,25 +49,16 @@ dependencies:
   intl: ^0.19.0
   uuid: ^4.5.1
   equatable: ^2.0.7
-  mime: ^2.0.0
-  path: ^1.9.0
   percent_indicator: ^4.2.3
   shimmer: ^3.0.0
   flutter_local_notifications: ^18.0.1
-  permission_handler: ^11.3.1
-  package_info_plus: ^10.0.2
-  http: ^1.2.2
-  
-  # YouTube Downloads
-  youtube_explode_dart: ^2.3.2
   
   # QR Scanner
   mobile_scanner: ^6.0.2
   
   # Cloud Services
   google_sign_in: ^6.2.2
-  drive_client: ^0.0.1
-  
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
