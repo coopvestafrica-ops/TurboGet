@@ -13,7 +13,6 @@ import '../services/database_service.dart';
 import '../services/logger_service.dart';
 import '../services/best_downloader_service.dart';
 import '../providers/providers.dart';
-import '../providers/best_downloader_provider.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
 import 'settings_screen.dart';
@@ -47,7 +46,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   StreamSubscription<dynamic>? _eventSub;
   Timer? _clipboardTimer;
   bool _isDownloading = false;
-  int _totalSpeed = 0;
+  double _totalSpeed = 0;
 
   // Animation controllers
   late AnimationController _fabAnimationController;
@@ -146,12 +145,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       }).length;
 
       int totalSizeAll = 0;
-      int totalSpeedAll = 0;
+      double totalSpeedAll = 0;
       
       for (final d in downloads) {
         totalSizeAll += d.totalSize;
         if (d.status == DownloadStatus.downloading) {
-          totalSpeedAll += d.speed.round();
+          totalSpeedAll += d.speed;
         }
       }
 
@@ -262,7 +261,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ),
         action: SnackBarAction(
           label: 'Open',
-          onPressed: () => _openFile(item),
+          onPressed: () => _openFileByPath(item.downloadPath, item.filename),
         ),
         duration: const Duration(seconds: 5),
         behavior: SnackBarBehavior.floating,
@@ -270,13 +269,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     );
   }
 
-  Future<void> _openFile(PersistedDownload item) async {
+  Future<void> _openFile(DownloadItem item) async {
     if (item.downloadPath != null) {
-      if (_mediaType.isPlayable(item.filename)) {
+      _openFileByPath(item.downloadPath, item.filename);
+    }
+  }
+
+  Future<void> _openFileByPath(String? path, String filename) async {
+    if (path != null) {
+      if (_mediaType.isPlayable(filename)) {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => MediaPlayerScreen(filePath: item.downloadPath!),
+            builder: (_) => MediaPlayerScreen(filePath: path),
           ),
         );
       }
@@ -673,7 +678,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           const SizedBox(width: 12),
           Expanded(
             child: _QuickActionButton(
-              icon: Icons.document_file,
+              icon: Icons.insert_drive_file,
               label: 'Documents',
               color: Colors.indigo,
               onTap: () => _showBatchImport('document'),

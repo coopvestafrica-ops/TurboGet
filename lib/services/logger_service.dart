@@ -29,11 +29,11 @@ class LoggerService {
   
   /// Initialize the logger with optional custom outputs
   Future<void> initialize({
-    LogLevel minLevel,
+    LogLevel? minLevel,
     bool enableFileOutput = false,
     String? logDirectory,
   }) async {
-    _minLevel = minLevel;
+    _minLevel = minLevel ?? (kDebugMode ? LogLevel.debug : LogLevel.info);
     _isDebugMode = kDebugMode;
     
     // Always add console output
@@ -185,6 +185,9 @@ class ConsoleLogOutput implements LogOutput {
       stdout.writeln(formattedMessage);
     }
   }
+
+  @override
+  Future<void> dispose() async {}
 }
 
 /// File log output for production debugging

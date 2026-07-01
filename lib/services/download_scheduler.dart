@@ -102,6 +102,23 @@ class DownloadScheduler {
     _checkAndStartDownloads();
   }
 
+  // Stub methods to satisfy download_provider.dart
+  Future<void> pauseDownload(String id) async {
+    // This is a stub - actual pause is handled by BestDownloaderService
+  }
+
+  Future<void> resumeDownload(String id) async {
+    // This is a stub - actual resume is handled by BestDownloaderService
+  }
+
+  Future<void> cancelDownload(String id) async {
+    // This is a stub - actual cancel is handled by BestDownloaderService
+  }
+
+  Future<void> retryDownload(String id) async {
+    // This is a stub - actual retry is handled by BestDownloaderService
+  }
+
   bool get isActive => _isSchedulerActive;
   int get queuedCount => _downloadQueue.length;
   

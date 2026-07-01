@@ -161,7 +161,7 @@ class NotificationService {
         channelDescription: 'Download completion notifications',
         importance: Importance.high,
         priority: Priority.high,
-        category: AndroidNotificationCategory.statusEvent,
+        category: AndroidNotificationCategory.progress,
         autoCancel: true,
         actions: [
           const AndroidNotificationAction(

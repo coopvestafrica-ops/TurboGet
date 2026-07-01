@@ -10,6 +10,7 @@ import 'services/auth_service.dart';
 import 'services/theme_service.dart';
 import 'services/logger_service.dart';
 import 'services/exception_handler.dart';
+import 'services/download_scheduler.dart';
 import 'screens/settings_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'providers/providers.dart';
@@ -44,7 +45,7 @@ Future<void> main() async {
     'AppStartup',
     () async {
       // Initialize core services in parallel
-      await Future.wait([
+      await Future.wait<void>([
         AdManager().initialize(),
         AuthService.instance.initialize(),
         ThemeService.instance.initialize(),
@@ -80,15 +81,18 @@ class TurboGetApp extends ConsumerWidget {
       home: const DashboardScreen(),
       // Global error handling for Material widgets
       builder: (context, child) {
-        return ErrorWidget.builder = (FlutterErrorDetails details) {
+        ErrorWidget.builder = (FlutterErrorDetails details) {
           logger.error(
             'UI',
             'Widget error: ${details.exceptionAsString()}',
             error: details.exception,
             stackTrace: details.stack,
           );
-          return _ErrorScreen(error: details.exceptionAsString());
+          return MaterialApp(
+            home: _ErrorScreen(error: details.exceptionAsString()),
+          );
         };
+        return child ?? const SizedBox.shrink();
       },
     );
   }

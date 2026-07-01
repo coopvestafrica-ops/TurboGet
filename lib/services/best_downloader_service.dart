@@ -474,7 +474,7 @@ class BestDownloaderService {
         
         if (retryCount < MAX_RETRIES) {
           // Retry with exponential backoff
-          final delay = RETRY_BASE_DELAY * math.pow(2, retryCount);
+          final delay = (RETRY_BASE_DELAY * math.pow(2, retryCount)).toInt();
           _logger.info('BestDownloader', 'Retrying in ${delay}ms (attempt ${retryCount + 1})');
           
           await Future.delayed(Duration(milliseconds: delay));

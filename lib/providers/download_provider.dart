@@ -4,16 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/download_item.dart';
 import '../services/database_service.dart';
 import '../services/download_scheduler.dart';
-
-/// Download status enum
-enum DownloadStatus {
-  queued,
-  downloading,
-  paused,
-  completed,
-  failed,
-  cancelled,
-}
+import '../services/best_downloader_service.dart';
 
 /// Download state class
 class DownloadState {
