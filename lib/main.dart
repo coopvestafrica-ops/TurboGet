@@ -11,8 +11,9 @@ import 'services/theme_service.dart';
 import 'services/logger_service.dart';
 import 'services/exception_handler.dart';
 import 'services/download_scheduler.dart';
+import 'services/turbo_downloader_engine.dart';
 import 'screens/settings_screen.dart';
-import 'screens/dashboard_screen.dart';
+import 'screens/turbo_dashboard_screen.dart';
 import 'providers/providers.dart';
 
 /// Application version info
@@ -50,6 +51,7 @@ Future<void> main() async {
         AuthService.instance.initialize(),
         ThemeService.instance.initialize(),
         DownloadScheduler.instance.initialize(),
+        turboDownloader.initialize(),
       ]);
       
       logger.info('AppStartup', 'All services initialized successfully');
@@ -78,7 +80,7 @@ class TurboGetApp extends ConsumerWidget {
       theme: ThemeService.instance.lightTheme,
       darkTheme: ThemeService.instance.darkTheme,
       themeMode: themeState.themeMode,
-      home: const DashboardScreen(),
+      home: const TurboDashboard(),
       // Global error handling for Material widgets
       builder: (context, child) {
         ErrorWidget.builder = (FlutterErrorDetails details) {
