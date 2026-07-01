@@ -4,8 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'services/ad_manager.dart';
 import 'services/auth_service.dart';
 import 'services/theme_service.dart';
 import 'services/logger_service.dart';
@@ -13,7 +11,7 @@ import 'services/exception_handler.dart';
 import 'services/download_scheduler.dart';
 import 'services/turbo_downloader_engine.dart';
 import 'services/app_theme.dart';
-import 'screens/settings_screen.dart';
+import 'services/ad_manager.dart';
 import 'screens/splash_screen.dart';
 import 'screens/turbo_dashboard_screen.dart';
 import 'providers/providers.dart';
