@@ -141,7 +141,7 @@ class _HistoryTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: _statusColor.withValues(alpha: 0.2),
+          backgroundColor: _statusColor.withOpacity(0.2),
           child: Icon(_statusIcon, color: _statusColor),
         ),
         title: Text(
