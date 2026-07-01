@@ -65,13 +65,6 @@ class AppTheme {
       ),
       iconTheme: IconThemeData(color: Color(0xFF1E293B)),
     ),
-    cardTheme: CardThemeData(
-      color: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-    ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: primaryBlue,
@@ -153,13 +146,6 @@ class AppTheme {
         fontWeight: FontWeight.bold,
       ),
       iconTheme: IconThemeData(color: Colors.white),
-    ),
-    cardTheme: CardThemeData(
-      color: const Color(0xFF1E293B),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(

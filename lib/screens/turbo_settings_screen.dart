@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/app_theme.dart';
 import '../services/turbo_downloader_engine.dart';
-import '../services/cloud_sync_service.dart';
-import '../services/scheduled_downloads_service.dart';
 import '../services/settings_manager.dart';
 
 /// ═══════════════════════════════════════════════════════════════════════════
@@ -37,26 +35,22 @@ class _TurboSettingsScreenState extends ConsumerState<TurboSettingsScreen> {
   void _loadSettings() {
     final settings = SettingsManager();
     setState(() {
-      _wifiOnly = settings.getBool('wifi_only') ?? false;
-      _autoRetry = settings.getBool('auto_retry') ?? true;
-      _notifications = settings.getBool('notifications_enabled') ?? true;
-      _cloudSync = cloudSync.isEnabled;
-      _maxRetries = settings.getInt('max_retries') ?? 5;
-      _maxConcurrent = settings.getInt('max_concurrent') ?? 3;
-      _bandwidthLimit = settings.getDouble('bandwidth_limit') ?? 0;
-      _downloadPath = settings.getString('download_path') ?? '/storage/downloads';
+      _wifiOnly = settings.isWifiOnly;
+      _autoRetry = true;
+      _notifications = true;
+      _cloudSync = false;
+      _maxRetries = 5;
+      _maxConcurrent = settings.maxConcurrentDownloads;
+      _bandwidthLimit = 0;
+      _downloadPath = settings.customDownloadPath ?? '/storage/downloads';
     });
   }
 
   void _saveSettings() {
     final settings = SettingsManager();
-    settings.setBool('wifi_only', _wifiOnly);
-    settings.setBool('auto_retry', _autoRetry);
-    settings.setBool('notifications_enabled', _notifications);
-    settings.setInt('max_retries', _maxRetries);
-    settings.setInt('max_concurrent', _maxConcurrent);
-    settings.setDouble('bandwidth_limit', _bandwidthLimit);
-    settings.setString('download_path', _downloadPath);
+    settings.isWifiOnly = _wifiOnly;
+    settings.maxConcurrentDownloads = _maxConcurrent;
+    settings.customDownloadPath = _downloadPath;
 
     turboDownloader.setWifiOnlyMode(_wifiOnly);
     if (_bandwidthLimit > 0) {
