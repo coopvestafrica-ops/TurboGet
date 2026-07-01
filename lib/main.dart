@@ -12,7 +12,9 @@ import 'services/logger_service.dart';
 import 'services/exception_handler.dart';
 import 'services/download_scheduler.dart';
 import 'services/turbo_downloader_engine.dart';
+import 'services/app_theme.dart';
 import 'screens/settings_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/turbo_dashboard_screen.dart';
 import 'providers/providers.dart';
 
@@ -77,10 +79,10 @@ class TurboGetApp extends ConsumerWidget {
     return MaterialApp(
       title: AppInfo.name,
       debugShowCheckedModeBanner: false,
-      theme: ThemeService.instance.lightTheme,
-      darkTheme: ThemeService.instance.darkTheme,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
       themeMode: themeState.themeMode,
-      home: const TurboDashboard(),
+      home: const SplashScreen(),
       // Global error handling for Material widgets
       builder: (context, child) {
         ErrorWidget.builder = (FlutterErrorDetails details) {

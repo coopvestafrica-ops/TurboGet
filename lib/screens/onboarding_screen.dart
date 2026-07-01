@@ -1,181 +1,211 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/settings_manager.dart';
+import 'dart:math' as math;
+import '../services/app_theme.dart';
+import 'turbo_dashboard_screen.dart';
 
-/// Onboarding Screen - First time user experience
+/// ═══════════════════════════════════════════════════════════════════════════
+/// TURBOGET ONBOARDING - World Class Design
+/// Designed by Olatunji Ayobami Ayanlowo +2347038193753
+/// ═══════════════════════════════════════════════════════════════════════════
+
 class OnboardingScreen extends StatefulWidget {
-  final VoidCallback onComplete;
-
-  const OnboardingScreen({super.key, required this.onComplete});
+  const OnboardingScreen({super.key});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with TickerProviderStateMixin {
   final PageController _pageController = PageController();
-  final SettingsManager _settings = SettingsManager();
   int _currentPage = 0;
+  late AnimationController _buttonController;
+  late Animation<double> _buttonAnimation;
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
-      icon: Icons.bolt,
-      title: 'Turbo Speed',
-      description: 'Download files at lightning speed with our advanced multi-segment technology. Up to 16 parallel connections!',
-      color: Colors.orange,
+      title: '🚀 Turbo Speed',
+      subtitle: 'Lightning Fast Downloads',
+      description:
+          'Experience download speeds up to 10x faster with our multi-connection technology. Download large files in seconds, not minutes.',
+      icon: Icons.bolt_rounded,
+      gradient: const [Color(0xFF0066FF), Color(0xFF8B5CF6)],
+      particles: ['⚡', '🔥', '⚡', '✨', '🔥'],
     ),
     OnboardingPage(
-      icon: Icons.sync,
-      title: 'Resume Anywhere',
-      description: 'Never lose your progress. Downloads automatically resume even after app close or device restart.',
-      color: Colors.green,
+      title: '☁️ Cloud Sync',
+      subtitle: 'Access Anywhere',
+      description:
+          'Your downloads sync across all your devices. Start a download on your phone, finish it on your laptop. Seamless experience guaranteed.',
+      icon: Icons.cloud_sync_rounded,
+      gradient: const [Color(0xFF00D9FF), Color(0xFF0066FF)],
+      particles: ['☁️', '📱', '💻', '☁️', '🔄'],
     ),
     OnboardingPage(
-      icon: Icons.movie,
-      title: 'Media Built-in',
-      description: 'Play videos and music directly in the app. No need for external players!',
-      color: Colors.blue,
+      title: '📋 Smart Queue',
+      subtitle: 'Intelligent Management',
+      description:
+          'Queue multiple downloads and let our AI prioritize them. Set schedules, bandwidth limits, and pause/resume anytime.',
+      icon: Icons.auto_awesome_rounded,
+      gradient: const [Color(0xFF8B5CF6), Color(0xFFFF006E)],
+      particles: ['🎯', '📊', '🎯', '⚡', '📋'],
     ),
     OnboardingPage(
-      icon: Icons.qr_code_scanner,
-      title: 'QR Scanner',
-      description: 'Scan QR codes to instantly download files. Point, scan, and go!',
-      color: Colors.purple,
-    ),
-    OnboardingPage(
-      icon: Icons.dark_mode,
-      title: 'Beautiful Design',
-      description: 'Enjoy a stunning, modern UI with dark mode support. Downloads never looked this good!',
-      color: Colors.indigo,
+      title: '🔒 Secure & Private',
+      subtitle: 'Your Data is Safe',
+      description:
+          'End-to-end encryption for all downloads. Automatic virus scanning. Zero tracking. Your privacy is our priority.',
+      icon: Icons.security_rounded,
+      gradient: const [Color(0xFF10B981), Color(0xFF059669)],
+      particles: ['🔒', '🛡️', '🔐', '🛡️', '🔒'],
     ),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _buttonController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _buttonAnimation = CurvedAnimation(
+      parent: _buttonController,
+      curve: Curves.easeOut,
+    );
+    _buttonController.forward();
+  }
+
+  @override
   void dispose() {
     _pageController.dispose();
+    _buttonController.dispose();
     super.dispose();
   }
 
-  Future<void> _completeOnboarding() async {
-    await _settings.initialize();
-    await _settings.setSetting('onboarding_completed', 'true');
-    widget.onComplete();
+  void _nextPage() {
+    if (_currentPage < _pages.length - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      _goToHome();
+    }
+  }
+
+  void _goToHome() {
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return const TurboDashboard();
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              Theme.of(context).colorScheme.surface,
-            ],
+            colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // Skip button
+              // Skip Button
               Align(
                 alignment: Alignment.topRight,
-                child: TextButton(
-                  onPressed: _completeOnboarding,
-                  child: const Text('Skip'),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: TextButton(
+                    onPressed: _goToHome,
+                    child: Text(
+                      'Skip',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              
-              // Page content
+
+              // Page Content
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
-                  itemCount: _pages.length,
                   onPageChanged: (index) {
                     setState(() => _currentPage = index);
                   },
+                  itemCount: _pages.length,
                   itemBuilder: (context, index) {
                     return _buildPage(_pages[index]);
                   },
                 ),
               ),
-              
-              // Page indicators
+
+              // Page Indicators
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(_pages.length, (index) {
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: _currentPage == index ? 24 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _currentPage == index
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.grey.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    );
-                  }),
+                  children: List.generate(
+                    _pages.length,
+                    (index) => _buildIndicator(index == _currentPage),
+                  ),
                 ),
               ),
-              
-              // Navigation buttons
+
+              // Navigation Button
               Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
-                  children: [
-                    if (_currentPage > 0)
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            _pageController.previousPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                padding: const EdgeInsets.fromLTRB(40, 0, 40, 40),
+                child: ScaleTransition(
+                  scale: _buttonAnimation,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 60,
+                    child: ElevatedButton(
+                      onPressed: _nextPage,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF0F172A),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _currentPage == _pages.length - 1
+                                ? 'Get Started'
+                                : 'Next',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          child: const Text('Back'),
-                        ),
-                      ),
-                    if (_currentPage > 0) const SizedBox(width: 16),
-                    Expanded(
-                      flex: _currentPage > 0 ? 1 : 2,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (_currentPage < _pages.length - 1) {
-                            _pageController.nextPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          } else {
-                            _completeOnboarding();
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          const SizedBox(width: 8),
+                          Icon(
+                            _currentPage == _pages.length - 1
+                                ? Icons.rocket_launch_rounded
+                                : Icons.arrow_forward_rounded,
                           ),
-                        ),
-                        child: Text(
-                          _currentPage < _pages.length - 1 ? 'Next' : 'Get Started',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -187,76 +217,148 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildPage(OnboardingPage page) {
     return Padding(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Icon
-          Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  page.color,
-                  page.color.withOpacity(0.7),
-                ],
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: page.color.withOpacity(0.4),
-                  blurRadius: 30,
-                  spreadRadius: 5,
+          // Floating Particles
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              // Glow Background
+              Container(
+                width: 250,
+                height: 250,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      page.gradient[0].withOpacity(0.3),
+                      page.gradient[1].withOpacity(0.1),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
-              ],
-            ),
-            child: Icon(
-              page.icon,
-              size: 80,
-              color: Colors.white,
-            ),
+              ),
+              
+              // Icon Container
+              Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: page.gradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(50),
+                  boxShadow: [
+                    BoxShadow(
+                      color: page.gradient[0].withOpacity(0.5),
+                      blurRadius: 40,
+                      spreadRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  page.icon,
+                  size: 100,
+                  color: Colors.white,
+                ),
+              ),
+              
+              // Floating particles
+              ...List.generate(page.particles.length, (index) {
+                final angle = (index / page.particles.length) * 3.14159 * 2;
+                return Positioned(
+                  left: 125 + 140 * math.cos(angle),
+                  top: 125 + 140 * math.sin(angle),
+                  child: Text(
+                    page.particles[index],
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                );
+              }),
+            ],
           ),
-          const SizedBox(height: 48),
+          
+          const SizedBox(height: 60),
           
           // Title
-          Text(
-            page.title,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: page.color,
+          ShaderMask(
+            shaderCallback: (bounds) {
+              return LinearGradient(colors: page.gradient).createShader(bounds);
+            },
+            child: Text(
+              page.title,
+              style: const TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          
+          const SizedBox(height: 8),
+          
+          // Subtitle
+          Text(
+            page.subtitle,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: page.gradient[0],
+            ),
+          ),
+          
+          const SizedBox(height: 24),
           
           // Description
           Text(
             page.description,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.grey[600],
-              height: 1.5,
-            ),
             textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.7),
+              height: 1.6,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildIndicator(bool isActive) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: isActive ? 32 : 8,
+      height: 8,
+      decoration: BoxDecoration(
+        gradient: isActive
+            ? AppTheme.turboGradient
+            : null,
+        color: isActive ? null : Colors.white.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }
 }
 
 class OnboardingPage {
-  final IconData icon;
   final String title;
+  final String subtitle;
   final String description;
-  final Color color;
+  final IconData icon;
+  final List<Color> gradient;
+  final List<String> particles;
 
   OnboardingPage({
-    required this.icon,
     required this.title,
+    required this.subtitle,
     required this.description,
-    required this.color,
+    required this.icon,
+    required this.gradient,
+    required this.particles,
   });
 }
